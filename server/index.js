@@ -11,13 +11,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Proxy për të shmangur CORS ---
+// Proxy për portalet IPTV
 app.get("/mag-proxy", async (req, res) => {
   const target = req.query.target;
   if (!target) return res.status(400).json({ error: "Missing target URL" });
 
   try {
-    const response = await fetch(target, { headers: { "User-Agent": "STBEmu/1.0" } });
+    const response = await fetch(target, {
+      headers: { "User-Agent": "Mozilla/5.0 STBEmu/1.2" },
+    });
     const text = await response.text();
     res.send(text);
   } catch (err) {
@@ -26,7 +28,7 @@ app.get("/mag-proxy", async (req, res) => {
   }
 });
 
-// --- Serve Vite frontend build ---
+// Serve React frontend build
 const clientPath = path.join(__dirname, "../client/dist");
 app.use(express.static(clientPath));
 app.get("*", (_, res) => res.sendFile(path.join(clientPath, "index.html")));
