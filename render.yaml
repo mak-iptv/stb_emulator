@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: stb-web-emulator
+    env: node
+    plan: free
+    region: frankfurt  # ose ndrysho sipas vendit tënd
+    buildCommand: |
+      cd client && npm install && npm run build && cd .. && npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+    autoDeploy: true
