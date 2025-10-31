@@ -1,15 +1,16 @@
 {
   "name": "stb-emulator",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "build": "cd client && npm install && npm run build",
-    "start": "cd client && npm run preview",
-    "postinstall": "cd client && npm install",
-    "dev": "concurrently \"cd client && npm run dev\""
+    "start": "node server/index.js",
+    "postinstall": "npm run build"
   },
   "dependencies": {
-    "concurrently": "^8.0.1"
+    "express": "^4.18.2",
+    "node-fetch": "^2.6.7",
+    "cors": "^2.8.5"
   },
   "engines": {
     "node": ">=18.0.0"
