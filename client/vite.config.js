@@ -9,8 +9,8 @@ export default defineConfig({
     proxy: {
       "/mag-proxy": {
         target: "http://localhost:10000",
-        changeOrigin: true
-      }
-    }
-  }
+        changeOrigin: true,
+      },
+    },
+  },
 });
