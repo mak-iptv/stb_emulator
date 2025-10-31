@@ -1,0 +1,18 @@
+{
+  "demo1": [
+    {
+      "title": "Morning News",
+      "start": "2025-10-31T06:00:00Z",
+      "end": "2025-10-31T07:00:00Z",
+      "desc": "Daily news headlines."
+    }
+  ],
+  "demo2": [
+    {
+      "title": "Sports Live",
+      "start": "2025-10-31T06:30:00Z",
+      "end": "2025-10-31T09:00:00Z",
+      "desc": "Live football coverage."
+    }
+  ]
+}
