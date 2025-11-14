@@ -1,299 +1,43 @@
-<!doctype html>
-<html lang="sq">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>IBO-style IPTV Player — Web M3U</title>
-  <meta name="description" content="Web IPTV player (M3U/HLS) me UI si IBO Player: grid kanalesh, kategori, favorites, numpad, EPG, ruajtje lokale" />
-  <style>
-    :root{--bg:#041426;--card:#071a2a;--muted:#9fb0c4;--accent:#00c2d8;--glass:rgba(255,255,255,0.03)}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:Inter,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#021021 0%,#041428 100%);color:#eaf6fb}
-    .app{max-width:1200px;margin:14px auto;padding:14px}
-    header{display:flex;justify-content:space-between;align-items:center;gap:12px}
-    h1{font-size:16px;margin:0}
-
-    .topbar{display:flex;gap:8px;align-items:center}
-    input[type=text]{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-    button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#002;cursor:pointer}
-    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
-
-    main{display:grid;grid-template-columns:420px 1fr;gap:14px;margin-top:12px}
-    .left{background:var(--card);padding:12px;border-radius:10px}
-    .player{background:#000;border-radius:8px;overflow:hidden}
-    video{width:100%;height:270px;display:block;background:#000}
-
-    .controls{display:flex;gap:8px;margin-top:10px}
-    .search{margin-top:8px}
-
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-    .chcard{background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);padding:8px;border-radius:8px;min-height:68px;display:flex;gap:8px;align-items:center;cursor:pointer}
-    .chcard img{width:96px;height:56px;object-fit:cover;border-radius:6px}
-    .chmeta{flex:1}
-    .chmeta b{display:block}
-
-    .right{background:var(--card);padding:12px;border-radius:10px}
-    .categories{display:flex;gap:6px;flex-wrap:wrap}
-    .cat{padding:6px 8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.03);cursor:pointer}
-    .cat.active{background:var(--accent);color:#002}
-
-    .epg{margin-top:12px;border-radius:8px;padding:8px;background:linear-gradient(90deg,rgba(255,255,255,0.01),transparent)}
-    .epg-item{padding:6px;border-radius:6px}
-
-    .numpad{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-    .num{width:56px;height:46px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.02);cursor:pointer}
-
-    .footer{margin-top:12px;color:var(--muted);font-size:13px}
-    @media(max-width:900px){main{grid-template-columns:1fr}video{height:200px}}
-  </style>
+  <meta charset="UTF-8">
+  <title>IPTV WEB Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Include HLS.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <header>
-      <div>
-        <h1>IBO-style Web IPTV Player</h1>
-        <div style="color:var(--muted);font-size:13px">Grid kanalesh, kategori, favorites, numpad, EPG — single file</div>
-      </div>
-      <div class="topbar">
-        <input id="m3uUrl" type="text" placeholder="Ngjit URL M3U ose HLS (.m3u8)..." style="min-width:360px">
-        <button id="loadUrl">Ngarko</button>
-        <label class="ghost" style="padding:8px;border-radius:8px;cursor:pointer">Ngarko skedarin <input id="fileInput" type="file" accept=".m3u,.txt" style="display:none"></label>
-        <button id="btnFavorites" class="ghost">Favorites</button>
-      </div>
-
-    </header>
-
-    <main>
-      <section class="left">
-        <div class="player"><video id="video" controls playsinline></video></div>
-        <div class="controls">
-          <button id="playPause">Play/Pause</button>
-          <button id="prev" class="ghost">Prev</button>
-          <button id="next" class="ghost">Next</button>
-          <button id="fs" class="ghost">FullScreen</button>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-          <input id="filter" class="search" placeholder="Kërko...">
-          <select id="viewMode"><option value="grid">Grid</option><option value="list">List</option></select>
-        </div>
-
-        <div id="channels" class="grid" aria-live="polite"></div>
-
-        <div class="numpad">
-          <!-- numpad for quick channel jump -->
-          <div class="num" data-num="1">1</div><div class="num" data-num="2">2</div><div class="num" data-num="3">3</div>
-          <div class="num" data-num="4">4</div><div class="num" data-num="5">5</div><div class="num" data-num="6">6</div>
-          <div class="num" data-num="7">7</div><div class="num" data-num="8">8</div><div class="num" data-num="9">9</div>
-          <div class="num" data-num="0">0</div>
-          <button id="goNumber" class="ghost">Shko</button>
-          <button id="clearNumber" class="ghost">C</button>
-        </div>
-
-      </section>
-
-      <aside class="right">
-        <div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <strong>Kategori</strong>
-            <button id="allCat" class="ghost">Të gjitha</button>
-          </div>
-          <div id="cats" class="categories" style="margin-top:8px"></div>
-        </div>
-
-        <div class="epg" id="epgBox">
-          <strong>EPG</strong>
-          <div id="epgList" style="margin-top:8px;color:var(--muted)">Ngarko XMLTV për të parë programet.</div>
-        </div>
-
-        <div style="margin-top:12px">
-          <strong>Kontrolle të shpejta</strong>
-          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-            <button id="favToggle" class="ghost">Shto/Fshi Favorite</button>
-            <button id="saveLocal" class="ghost">Ruaj Playlist</button>
-            <button id="loadLocal" class="ghost">Ngarko Ruajtje</button>
-          </div>
-        </div>
-
-        <div class="footer">Shënim: Për URL nga domain të jashtëm, serveri duhet të lejojë CORS. Përdor proxy ose ngarko skedarin.</div>
-      </aside>
-    </main>
+  <header>
+    <!-- Replace "logo.png" with your logo file name -->
+    <img src="logo.png" alt="IPTV Logo">
+    <h1>IPTV WEB Player</h1>
+  </header>
+  <div class="file-input">
+    <p>Upload the .m3u or .m3u8 file of your IPTV channels:</p>
+    <input type="file" id="m3uFile" accept=".m3u, .m3u8">
+    <p>(You can interact with the player using mouse, touch, keyboard, gamepad, or remote control).</p>
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script>
-    // Simple IBO-like web IPTV player
-    // Features: parse M3U, grid/list view, categories (from group-title), favorites, numpad channel jump, EPG loader (XMLTV), localStorage save/load
-
-    // --- Parsers ---
-    function parseM3U(text){
-      const lines = text.split(/\r?\n/);
-      const items = [];
-      let lastInfo = null;
-      for(const raw of lines){
-        const line = raw.trim(); if(!line) continue;
-        if(line.startsWith('#EXTINF')){ lastInfo = line; }
-        else if(line.startsWith('#')){ continue; }
-        else {
-          const url = line;
-          if(lastInfo){
-            const info = lastInfo.substring(8);
-            const attrs = {};
-            const attrRe = /(\w[\w-]*?)\s*=\s*"([^"]*)"/g;
-            let m; while((m=attrRe.exec(info))!==null) attrs[m[1]] = m[2];
-            const comma = info.indexOf(',');
-            const name = comma !== -1 ? info.substring(comma+1).trim() : url;
-            const group = attrs['group-title'] || attrs['group'] || 'Pa kategori';
-            const logo = attrs['tvg-logo']||attrs.logo||'';
-            items.push({name, url, group, logo});
-            lastInfo = null;
-          } else {
-            items.push({name:url,url,group:'Pa kategori',logo:''});
-          }
-        }
-      }
-      return items;
-    }
-
-    function parseXMLTV(xmlText){
-      try{
-        const doc = new DOMParser().parseFromString(xmlText,'application/xml');
-        const progs = Array.from(doc.getElementsByTagName('programme'));
-        const epg = {};
-        progs.forEach(p=>{
-          const ch = p.getAttribute('channel');
-          const titleNode = p.getElementsByTagName('title')[0];
-          const title = titleNode ? titleNode.textContent : '—';
-          const start = p.getAttribute('start');
-          if(!epg[ch]) epg[ch] = [];
-          epg[ch].push({start,title});
-        });
-        return epg;
-      }catch(e){return {};}
-    }
-
-    // --- State ---
-    let channels = [];
-    let filtered = [];
-    let favorites = JSON.parse(localStorage.getItem('ibo_favs_v1')||'[]');
-    let epg = {};
-    let currentIndex = -1;
-    let inputNumber = '';
-
-    // --- Elements ---
-    const video = document.getElementById('video');
-    const channelsEl = document.getElementById('channels');
-    const catsEl = document.getElementById('cats');
-    const filterEl = document.getElementById('filter');
-    const viewModeEl = document.getElementById('viewMode');
-    const epgList = document.getElementById('epgList');
-
-    // --- Render functions ---
-    function renderCategories(){
-      const groups = Array.from(new Set(channels.map(c=>c.group||'Pa kategori'))).sort();
-      catsEl.innerHTML = '';
-      groups.forEach(g=>{
-        const b = document.createElement('button'); b.className='cat'; b.textContent = g; b.addEventListener('click', ()=>{ applyCategory(g); });
-        catsEl.appendChild(b);
-      });
-    }
-
-    function renderChannels(){
-      const q = filterEl.value.trim().toLowerCase();
-      filtered = channels.filter(c => c.name.toLowerCase().includes(q));
-      channelsEl.innerHTML = '';
-      if(viewModeEl.value === 'list'){
-        channelsEl.style.display = 'block'; channelsEl.style.gridTemplateColumns = '1fr';
-      } else { channelsEl.style.display = 'grid'; channelsEl.style.gridTemplateColumns = 'repeat(3,1fr)'; }
-      filtered.forEach((c, idx)=>{
-        const card = document.createElement('div'); card.className='chcard';
-        const img = document.createElement('img'); img.src = c.logo || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="100%" height="100%" fill="#072031"/></svg>';
-        const meta = document.createElement('div'); meta.className='chmeta';
-        meta.innerHTML = `<b>${escapeHtml(c.name)}</b><div style="color:var(--muted);font-size:13px">${escapeHtml(c.group)}</div>`;
-        const favBtn = document.createElement('button'); favBtn.textContent = favorites.includes(c.url)? '★' : '☆'; favBtn.className='ghost'; favBtn.addEventListener('click',(e)=>{ e.stopPropagation(); toggleFav(c); favBtn.textContent = favorites.includes(c.url)? '★' : '☆'; });
-        card.appendChild(img); card.appendChild(meta); card.appendChild(favBtn);
-        card.addEventListener('click', ()=> playChannelByFilteredIndex(idx));
-        channelsEl.appendChild(card);
-      });
-    }
-
-    function escapeHtml(s){ return String(s||'').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]||c)); }
-
-    // --- Play ---
-    function playChannelByFilteredIndex(idx){ const ch = filtered[idx]; if(!ch) return; currentIndex = channels.indexOf(ch); playChannel(ch); }
-    function playChannel(ch){
-      if(!ch || !ch.url) return alert('URL i kanalit mungon');
-      const src = ch.url;
-      if(src.includes('.m3u8')){
-        if(window.Hls && Hls.isSupported()){
-          if(window.__hls) { window.__hls.destroy(); window.__hls = null; }
-          window.__hls = new Hls(); window.__hls.loadSource(src); window.__hls.attachMedia(video); window.__hls.on(Hls.Events.MANIFEST_PARSED, ()=> video.play().catch(()=>{}));
-        } else { video.src = src; video.play().catch(()=>{}); }
-      } else { video.src = src; video.play().catch(()=>{ alert('Ky stream mund të mos luajë në shfletues.'); }); }
-      showEPGFor(ch);
-    }
-
-    // --- Favorites ---
-    function toggleFav(ch){ if(!ch) return; const i = favorites.indexOf(ch.url); if(i===-1) favorites.push(ch.url); else favorites.splice(i,1); localStorage.setItem('ibo_favs_v1', JSON.stringify(favorites)); }
-    function showFavorites(){ channels = channels.map(c=>c); // keep same order
-      channels = channels.filter(c=> favorites.includes(c.url)); renderCategories(); renderChannels(); }
-
-    // --- Category / filter ---
-    function applyCategory(g){ filterEl.value=''; channels = channels; // no-op to keep global
-      const nodes = Array.from(catsEl.children); nodes.forEach(n=> n.classList.toggle('active', n.textContent===g));
-      filtered = channels.filter(c=> c.group===g ); renderChannelsFromFiltered(); }
-    function renderChannelsFromFiltered(){ channelsEl.innerHTML=''; filtered.forEach((c,idx)=>{ const card=document.createElement('div'); card.className='chcard'; const img=document.createElement('img'); img.src=c.logo||'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="100%" height="100%" fill="#072031"/></svg>'; const meta=document.createElement('div'); meta.className='chmeta'; meta.innerHTML=`<b>${escapeHtml(c.name)}</b><div style="color:var(--muted);font-size:13px">${escapeHtml(c.group)}</div>`; card.appendChild(img); card.appendChild(meta); card.addEventListener('click', ()=> playChannelByFilteredIndex(idx)); channelsEl.appendChild(card); }); }
-
-    // --- EPG ---
-    function showEPGFor(ch){ epgList.innerHTML=''; if(!epg || Object.keys(epg).length===0){ epgList.textContent='EPG nuk u ngarkua.'; return; }
-      // try find by exact tvg-id or by name include
-      const keys = Object.keys(epg);
-      let key = keys.find(k=> k.toLowerCase()=== (ch.name||'').toLowerCase());
-      if(!key) key = keys.find(k=> (ch.url||'').includes(k));
-      if(!key) key = keys.find(k=> k.toLowerCase().includes((ch.name||'').toLowerCase()));
-      if(!key){ epgList.textContent='Nuk u gjet EPG për këtë kanal.'; return; }
-      const list = epg[key]; if(!list) { epgList.textContent='EPG bosh.'; return; }
-      epgList.innerHTML = '';
-      list.slice(0,8).forEach(ev=>{ const d=document.createElement('div'); d.className='epg-item'; d.innerHTML = `<div style="font-weight:600">${escapeHtml(ev.title)}</div><div style="color:var(--muted);font-size:13px">${ev.start}</div>`; epgList.appendChild(d); });
-    }
-
-    // --- Numpad handling ---
-    document.querySelectorAll('.num').forEach(n=> n.addEventListener('click', ()=>{ inputNumber += n.dataset.num; }));
-    document.getElementById('clearNumber').addEventListener('click', ()=>{ inputNumber=''; });
-    document.getElementById('goNumber').addEventListener('click', ()=>{
-      if(!inputNumber) return; const num = parseInt(inputNumber,10); if(isNaN(num)) return; // channels numbered from 1
-      if(num<=0 || num>channels.length) return alert('Numër jashtë rangut'); playChannel(channels[num-1]); inputNumber='';
-    });
-
-    // --- File & URL hooks ---
-    document.getElementById('loadUrl').addEventListener('click', ()=>{ const url=document.getElementById('m3uUrl').value.trim(); if(!url) return alert('Vendos URL'); fetch(url).then(r=>{ if(!r.ok) throw new Error('Network '+r.status); return r.text(); }).then(t=>{ channels = parseM3U(t); renderCategories(); renderChannels(); }).catch(e=> alert('Gabim: '+e.message+' (CORS mund të bllokojë fetch). Ngarko skedarin ose përdor proxy.)'); });
-    document.getElementById('fileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload = ev=>{ channels = parseM3U(ev.target.result); renderCategories(); renderChannels(); }; r.readAsText(f); });
-
-    // --- Search / view mode ---
-    filterEl.addEventListener('input', ()=> renderChannels());
-    viewModeEl.addEventListener('change', ()=> renderChannels());
-
-    // --- Prev / Next / Play ---
-    document.getElementById('playPause').addEventListener('click', ()=> { video.paused ? video.play() : video.pause(); });
-    document.getElementById('prev').addEventListener('click', ()=>{ if(currentIndex>0) playChannel(channels[currentIndex-1]); });
-    document.getElementById('next').addEventListener('click', ()=>{ if(currentIndex<channels.length-1) playChannel(channels[currentIndex+1]); });
-    document.getElementById('fs').addEventListener('click', ()=>{ if(document.fullscreenElement) document.exitFullscreen(); else video.requestFullscreen(); });
-
-    // --- Save/load playlist locally ---
-    document.getElementById('saveLocal').addEventListener('click', ()=>{ const name = prompt('Emërto ruajtjen:'); if(!name) return; const all = JSON.parse(localStorage.getItem('ibo_saved')||'{}'); all[name] = channels; localStorage.setItem('ibo_saved', JSON.stringify(all)); alert('Ruajtur.'); });
-    document.getElementById('loadLocal').addEventListener('click', ()=>{ const all = JSON.parse(localStorage.getItem('ibo_saved')||'{}'); const names = Object.keys(all); if(!names.length) return alert('Nuk ka ruajtje'); const sel = prompt('Zgjidh një: \n' + names.join('\n')); if(!sel) return; channels = all[sel]||[]; renderCategories(); renderChannels(); });
-
-    // --- Favorites view ---
-    document.getElementById('btnFavorites').addEventListener('click', ()=>{ if(!favorites.length) return alert('Nuk ka favorite'); channels = channels.filter(c=> favorites.includes(c.url)); renderChannels(); });
-    document.getElementById('favToggle').addEventListener('click', ()=>{ const ch = channels[currentIndex]; if(!ch) return; toggleFav(ch); alert('Toggled favorite'); });
-
-    // --- EPG loader (prompt for XML file) ---
-    document.getElementById('epgBox').addEventListener('click', ()=>{
-      const input = document.createElement('input'); input.type='file'; input.accept='.xml,.xmltv'; input.addEventListener('change', e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ epg = parseXMLTV(ev.target.result); alert('EPG u ngarkua ('+Object.keys(epg).length+' channels)'); }; r.readAsText(f); }); input.click();
-    });
-
-    // helper on load: example empty channels
-    renderChannels(); renderCategories();
-  </script>
+  <div class="main-container">
+    <!-- Player area -->
+    <div class="player-container">
+      <div class="spinner-overlay" id="spinner">
+        <div class="spinner"></div>
+      </div>
+      <video id="videoPlayer" controls></video>
+    </div>
+    <!-- Channel list -->
+    <aside class="channel-list" id="channelList">
+      <div id="channelsContainer">
+        <!-- Channels will be generated dynamically here -->
+      </div>
+    </aside>
+  </div>
+  <footer>
+    © 2025 IPTV WEB Player | By  Mak-iptv| GPLv3 | All Rights Reserved.
+  </footer>
+  <script src="script.js"></script>
 </body>
 </html>
