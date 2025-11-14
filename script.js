@@ -1,183 +1,326 @@
-class STBPlayer {
+class StalkerPortalPlayer {
     constructor() {
-        this.videoPlayer = document.getElementById('videoPlayer');
-        this.macDisplay = document.getElementById('macAddress');
-        this.urlDisplay = document.getElementById('urlDisplay');
-        this.currentUrl = document.getElementById('currentUrl');
-        this.loading = document.getElementById('loading');
-        this.channelsContainer = document.getElementById('channelsContainer');
-        this.serverUrlInput = document.getElementById('serverUrl');
-        this.macPrefixInput = document.getElementById('macPrefix');
+        this.portalUrl = '';
+        this.macAddress = '';
+        this.token = '';
+        this.channels = [];
+        this.categories = [];
+        this.currentChannel = null;
         
-        this.config = {
-            serverUrl: 'http://localhost:8080',
-            macPrefix: '00:A1:79'
+        this.elements = {
+            portalUrl: document.getElementById('portalUrl'),
+            macAddressInput: document.getElementById('macAddressInput'),
+            username: document.getElementById('username'),
+            password: document.getElementById('password'),
+            connectBtn: document.getElementById('connectBtn'),
+            connectionStatus: document.getElementById('connectionStatus'),
+            connectionInfo: document.getElementById('connectionInfo'),
+            serverInfo: document.getElementById('serverInfo'),
+            videoPlayer: document.getElementById('videoPlayer'),
+            loading: document.getElementById('loading'),
+            playerControls: document.getElementById('playerControls'),
+            categoriesContainer: document.getElementById('categoriesContainer'),
+            categoriesList: document.getElementById('categoriesList'),
+            channelsContainer: document.getElementById('channelsContainer'),
+            channelsList: document.getElementById('channelsList'),
+            logContainer: document.getElementById('logContainer')
         };
-        
+
         this.init();
     }
 
     init() {
-        this.loadConfig();
-        this.generateMAC();
         this.setupEventListeners();
-        this.loadChannels();
-        this.updateDisplay();
-        this.simulateConnection();
-    }
-
-    loadConfig() {
-        const savedConfig = localStorage.getItem('stbConfig');
-        if (savedConfig) {
-            this.config = JSON.parse(savedConfig);
-            this.serverUrlInput.value = this.config.serverUrl;
-            this.macPrefixInput.value = this.config.macPrefix;
-        }
-    }
-
-    saveConfig() {
-        this.config.serverUrl = this.serverUrlInput.value;
-        this.config.macPrefix = this.macPrefixInput.value;
-        localStorage.setItem('stbConfig', JSON.stringify(this.config));
-        this.generateMAC();
-        this.updateDisplay();
-        alert('Konfigurimi u ruajt!');
-    }
-
-    generateMAC() {
-        // Gjeneron pjesën e fundit të MAC adresës
-        const suffix = Array.from({length: 3}, () => 
-            Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
-        ).join(':');
-        
-        const fullMAC = `${this.config.macPrefix}:${suffix}`;
-        this.macDisplay.textContent = fullMAC.toUpperCase();
-        return fullMAC;
-    }
-
-    updateDisplay() {
-        const mac = this.macDisplay.textContent;
-        const fullUrl = `${this.config.serverUrl}/c?mac=${mac}`;
-        this.urlDisplay.textContent = `URL: ${this.config.serverUrl}/c`;
-        this.currentUrl.textContent = fullUrl;
+        this.loadSavedConfig();
+        this.log('Player i inicializuar');
     }
 
     setupEventListeners() {
+        this.elements.connectBtn.addEventListener('click', () => {
+            this.connectToPortal();
+        });
+
         // Kontrollet e videos
         document.getElementById('playBtn').addEventListener('click', () => {
-            this.videoPlayer.play();
+            this.elements.videoPlayer.play();
         });
 
         document.getElementById('pauseBtn').addEventListener('click', () => {
-            this.videoPlayer.pause();
+            this.elements.videoPlayer.pause();
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            this.stopPlayback();
         });
 
         document.getElementById('fullscreenBtn').addEventListener('click', () => {
             this.toggleFullscreen();
         });
-
-        document.getElementById('connectBtn').addEventListener('click', () => {
-            this.connectToServer();
-        });
-
-        document.getElementById('saveConfig').addEventListener('click', () => {
-            this.saveConfig();
-        });
-
-        // Simulim të ndryshimeve në input
-        this.serverUrlInput.addEventListener('change', () => {
-            this.updateDisplay();
-        });
-
-        this.macPrefixInput.addEventListener('input', () => {
-            this.updateDisplay();
-        });
     }
 
-    async connectToServer() {
+    async connectToPortal() {
+        this.portalUrl = this.elements.portalUrl.value.trim();
+        this.macAddress = this.elements.macAddressInput.value.trim();
+        const username = this.elements.username.value.trim();
+        const password = this.elements.password.value.trim();
+
+        if (!this.portalUrl || !this.macAddress) {
+            this.log('Gabim: URL dhe MAC adresa janë të detyrueshme', 'error');
+            return;
+        }
+
         this.showLoading();
-        
+        this.elements.connectBtn.disabled = true;
+        this.updateStatus('Duke u lidhur...');
+
         try {
-            // Simulim të lidhjes me server
-            const mac = this.macDisplay.textContent;
-            const connectUrl = `${this.config.serverUrl}/c?mac=${mac}`;
+            // Hapi 1: Handshake me portal
+            await this.handshake();
             
-            console.log('Duke u lidhur me:', connectUrl);
+            // Hapi 2: Marr token
+            await this.getToken(username, password);
             
-            // Simulim delay të lidhjes
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Hapi 3: Merr informacion profili
+            await this.getProfile();
             
-            // Këtu do të bëhej një kërkesë e vërtetë
-            // const response = await fetch(connectUrl);
+            // Hapi 4: Merr kanalet
+            await this.getChannels();
             
-            this.hideLoading();
-            alert(`U lidh me sukses!\nServer: ${this.config.serverUrl}\nMAC: ${mac}`);
+            this.log('U lidh me sukses me portal!', 'success');
+            this.showPlayerInterface();
             
         } catch (error) {
+            this.log('Gabim në lidhje: ' + error.message, 'error');
+            this.updateStatus('Lidhja dështoi');
+        } finally {
             this.hideLoading();
-            alert('Gabim në lidhje: ' + error.message);
+            this.elements.connectBtn.disabled = false;
         }
     }
 
-    simulateConnection() {
-        // Simulon një lidhje aktive
-        console.log('STB Player i gatshëm');
-        console.log('MAC:', this.macDisplay.textContent);
-        console.log('Server:', this.config.serverUrl);
+    async handshake() {
+        this.log('Duke kryer handshake...');
+        
+        const handshakeUrl = `${this.portalUrl}/server/load.php?type=stb&action=handshake&token=&JsHttpRequest=1-xml`;
+        
+        const response = await fetch(handshakeUrl, {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
+                'X-User-Agent': 'Model: MAG250; Link: Ethernet'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Handshake dështoi: ${response.status}`);
+        }
+
+        const data = await response.json();
+        this.log('Handshake i suksesshëm');
+        return data;
     }
 
-    loadChannels() {
-        const sampleChannels = [
-            { name: 'Kanal 1 SHQIP', url: 'http://example.com/stream1.m3u8' },
-            { name: 'Kanal 2 NEWS', url: 'http://example.com/stream2.m3u8' },
-            { name: 'Kanal 3 FILMA', url: 'http://example.com/stream3.m3u8' },
-            { name: 'Kanal 4 SPORT', url: 'http://example.com/stream4.m3u8' },
-            { name: 'Kanal 5 MUZIKË', url: 'http://example.com/stream5.m3u8' },
-            { name: 'Kanal 6 DOC', url: 'http://example.com/stream6.m3u8' }
-        ];
+    async getToken(username, password) {
+        this.log('Duke marrë token...');
+        
+        let authUrl = `${this.portalUrl}/server/load.php?type=stb&action=handshake&token=&JsHttpRequest=1-xml`;
+        
+        // Nëse ka credentials, përdor autentikim
+        if (username && password) {
+            authUrl += `&login=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+        } else {
+            // Autentikim me MAC
+            authUrl += `&mac=${this.macAddress}`;
+        }
 
-        this.channelsContainer.innerHTML = '';
-        sampleChannels.forEach(channel => {
+        const response = await fetch(authUrl, {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
+                'X-User-Agent': 'Model: MAG250; Link: Ethernet',
+                'MAC': this.macAddress
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Autentikimi dështoi: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.js && data.js.token) {
+            this.token = data.js.token;
+            this.log('Token i marrë: ' + this.token.substring(0, 10) + '...', 'success');
+        } else {
+            throw new Error('Nuk u gjet token në përgjigje');
+        }
+    }
+
+    async getProfile() {
+        this.log('Duke marrë informacion profili...');
+        
+        const profileUrl = `${this.portalUrl}/server/load.php?type=stb&action=get_profile&token=${this.token}&JsHttpRequest=1-xml`;
+        
+        const response = await fetch(profileUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
+                'MAC': this.macAddress
+            }
+        });
+
+        const data = await response.json();
+        this.displayServerInfo(data);
+        this.log('Profili i marrë');
+    }
+
+    async getChannels() {
+        this.log('Duke marrë listën e kanaleve...');
+        
+        const channelsUrl = `${this.portalUrl}/server/load.php?type=stb&action=get_all_channels&token=${this.token}&JsHttpRequest=1-xml`;
+        
+        const response = await fetch(channelsUrl, {
+            headers: {
+                'MAC': this.macAddress
+            }
+        });
+
+        const data = await response.json();
+        
+        if (data.js && data.js.data) {
+            this.channels = data.js.data;
+            this.displayChannels();
+            this.log(`U gjetën ${this.channels.length} kanale`, 'success');
+        }
+    }
+
+    displayServerInfo(profileData) {
+        let infoHTML = '';
+        
+        if (profileData.js && profileData.js.data) {
+            const info = profileData.js.data;
+            infoHTML = `
+                <p><strong>Server:</strong> ${this.portalUrl}</p>
+                <p><strong>MAC:</strong> ${this.macAddress}</p>
+                <p><strong>Status:</strong> <span style="color: #28a745;">I lidhur</span></p>
+                ${info.full_name ? `<p><strong>Abonues:</strong> ${info.full_name}</p>` : ''}
+                ${info.license ? `<p><strong>Licencë:</strong> ${info.license}</p>` : ''}
+            `;
+        }
+        
+        this.elements.serverInfo.innerHTML = infoHTML;
+        this.elements.connectionInfo.style.display = 'block';
+        this.updateStatus('I lidhur');
+    }
+
+    displayChannels() {
+        this.elements.channelsList.innerHTML = '';
+        
+        this.channels.forEach(channel => {
             const channelElement = document.createElement('div');
             channelElement.className = 'channel';
-            channelElement.textContent = channel.name;
+            channelElement.innerHTML = `
+                <strong>${channel.name}</strong>
+                ${channel.Number ? `<br><small>Numri: ${channel.Number}</small>` : ''}
+            `;
+            
             channelElement.addEventListener('click', () => {
-                this.playChannel(channel.url);
-                // Aktivizo kanalin e zgjedhur
-                document.querySelectorAll('.channel').forEach(ch => ch.classList.remove('active'));
-                channelElement.classList.add('active');
+                this.playChannel(channel);
             });
-            this.channelsContainer.appendChild(channelElement);
+            
+            this.elements.channelsList.appendChild(channelElement);
         });
+        
+        this.elements.channelsContainer.style.display = 'block';
     }
 
-    playChannel(url) {
+    async playChannel(channel) {
+        this.log(`Duke luajtur: ${channel.name}`);
         this.showLoading();
         
-        // Simulim të ngarkimit të kanalit
-        setTimeout(() => {
-            this.videoPlayer.src = url;
-            this.videoPlayer.play().catch(error => {
-                console.log('Gabim në play:', error);
-                this.hideLoading();
-                alert('Stream nuk mund të luhet. Kjo është një simulim.');
-            });
+        try {
+            // Merr URL-në e stream-it për këtë kanal
+            const streamUrl = await this.getStreamUrl(channel.id);
+            
+            if (streamUrl) {
+                this.elements.videoPlayer.style.display = 'block';
+                this.elements.videoPlayer.src = streamUrl;
+                
+                this.elements.videoPlayer.play().then(() => {
+                    this.log(`Duke luajtur: ${channel.name}`, 'success');
+                    this.hideLoading();
+                    this.elements.playerControls.style.display = 'flex';
+                }).catch(error => {
+                    this.log('Gabim në play: ' + error.message, 'error');
+                    this.hideLoading();
+                });
+            }
+        } catch (error) {
+            this.log('Gabim në marrjen e stream-it: ' + error.message, 'error');
             this.hideLoading();
-        }, 1000);
+        }
+    }
+
+    async getStreamUrl(channelId) {
+        const streamUrl = `${this.portalUrl}/server/load.php?type=stb&action=create_link&token=${this.token}&JsHttpRequest=1-xml&cmd=${channelId}`;
+        
+        const response = await fetch(streamUrl, {
+            headers: {
+                'MAC': this.macAddress
+            }
+        });
+
+        const data = await response.json();
+        
+        if (data.js && data.js.cmd) {
+            // Kthe URL-në e stream-it
+            return data.js.cmd;
+        } else {
+            throw new Error('Nuk u gjet stream URL');
+        }
+    }
+
+    stopPlayback() {
+        this.elements.videoPlayer.pause();
+        this.elements.videoPlayer.src = '';
+        this.elements.videoPlayer.style.display = 'none';
+        this.elements.playerControls.style.display = 'none';
+        this.log('Playback u ndal');
+    }
+
+    showPlayerInterface() {
+        this.elements.playerControls.style.display = 'flex';
+        this.elements.categoriesContainer.style.display = 'block';
+        this.elements.channelsContainer.style.display = 'block';
     }
 
     showLoading() {
-        this.loading.style.display = 'block';
+        this.elements.loading.style.display = 'block';
     }
 
     hideLoading() {
-        this.loading.style.display = 'none';
+        this.elements.loading.style.display = 'none';
+    }
+
+    updateStatus(status) {
+        this.elements.connectionStatus.textContent = status;
+        this.elements.connectionStatus.className = status === 'I lidhur' ? 'status connected' : 'status disconnected';
+    }
+
+    log(message, type = 'info') {
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry log-${type}`;
+        logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        
+        this.elements.logContainer.appendChild(logEntry);
+        this.elements.logContainer.scrollTop = this.elements.logContainer.scrollHeight;
+        
+        console.log(`[StalkerPlayer] ${message}`);
     }
 
     toggleFullscreen() {
         if (!document.fullscreenElement) {
-            if (this.videoPlayer.requestFullscreen) {
-                this.videoPlayer.requestFullscreen();
+            if (this.elements.videoPlayer.requestFullscreen) {
+                this.elements.videoPlayer.requestFullscreen();
             }
         } else {
             if (document.exitFullscreen) {
@@ -185,24 +328,28 @@ class STBPlayer {
             }
         }
     }
+
+    loadSavedConfig() {
+        const savedConfig = localStorage.getItem('stalkerConfig');
+        if (savedConfig) {
+            const config = JSON.parse(savedConfig);
+            this.elements.portalUrl.value = config.portalUrl || '';
+            this.elements.macAddressInput.value = config.macAddress || '00:1A:79:00:00:01';
+            this.elements.username.value = config.username || '';
+        }
+    }
+
+    saveConfig() {
+        const config = {
+            portalUrl: this.elements.portalUrl.value,
+            macAddress: this.elements.macAddressInput.value,
+            username: this.elements.username.value
+        };
+        localStorage.setItem('stalkerConfig', JSON.stringify(config));
+    }
 }
 
 // Initialize player
 document.addEventListener('DOMContentLoaded', () => {
-    new STBPlayer();
+    new StalkerPortalPlayer();
 });
-
-// Shembull i kërkesës aktuale
-async function connectToRealServer() {
-    const response = await fetch('http://your-server:port/c', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            mac: '00:A1:79:XX:XX:XX',
-            action: 'authenticate'
-        })
-    });
-    return await response.json();
-}
