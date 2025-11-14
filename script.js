@@ -165,3 +165,37 @@ class ExtreamTVPlayer {
 
     // ... pjesa tjetër e kodit ...
 }
+async loadExtreamUrl() {
+    const url = document.getElementById('extreamUrl').value.trim();
+    if (!url) {
+        alert('Ju lutem shkruani një URL!');
+        return;
+    }
+
+    this.showLoadingMessage('Duke ngarkuar...');
+
+    try {
+        // Krijo një skedar M3U virtual me URL-në e dhënë
+        const virtualM3U = `#EXTM3U
+#EXTINF:-1 tvg-id="extream1" tvg-name="Extream Stream 1" tvg-logo="" group-title="Extream",Extream Stream 1
+${url}`;
+
+        this.parseM3U(virtualM3U);
+        this.filteredPlaylist = [...this.playlist];
+        this.renderCategories();
+        this.renderPlaylist();
+        this.closeExtreamModal();
+        
+        if (this.playlist.length > 0) {
+            this.loadTrack(0);
+            this.showErrorMessage('URL u ngarkua! Nëse nuk punon, provoni direkt në VLC.');
+        }
+        
+        this.hideLoadingMessage();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        this.hideLoadingMessage();
+        this.showErrorMessage('Provoni direkt në VLC ose shfletues tjetër');
+    }
+}
