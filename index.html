@@ -3,55 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web STB Player - 00:A1:79</title>
+    <title>Stalker Portal Player</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="stb-container">
         <div class="player-header">
-            <h1>Web STB Player</h1>
-            <div class="mac-display">MAC: <span id="macAddress">00:A1:79:00:00:00</span></div>
-            <div class="url-display" id="urlDisplay"></div>
+            <h1>Stalker Portal Player</h1>
+            <div class="mac-display">MAC: <span id="macAddress">00:1A:79:00:00:00</span></div>
+            <div class="status" id="connectionStatus">I palidhur</div>
         </div>
-        
-        <div class="connection-info">
-            <div class="info-box">
-                <h3>Informacion Lidhjeje</h3>
-                <p><strong>URL:</strong> <span id="currentUrl"></span></p>
-                <p><strong>MAC:</strong> 00:A1:79:XX:XX:XX</p>
-                <p><strong>Status:</strong> <span class="status-connected">I lidhur</span></p>
+
+        <div class="portal-config">
+            <h3>Konfigurimi i Portalit</h3>
+            <div class="config-form">
+                <div class="input-group">
+                    <label>Portal URL:</label>
+                    <input type="text" id="portalUrl" placeholder="http://tv.example.com:80" value="http://localhost:80">
+                </div>
+                <div class="input-group">
+                    <label>MAC Address:</label>
+                    <input type="text" id="macAddressInput" placeholder="00:1A:79:XX:XX:XX" value="00:1A:79:00:00:01">
+                </div>
+                <div class="input-group">
+                    <label>Username (opsional):</label>
+                    <input type="text" id="username" placeholder="username">
+                </div>
+                <div class="input-group">
+                    <label>Password (opsional):</label>
+                    <input type="password" id="password" placeholder="password">
+                </div>
+                <button id="connectBtn">Lidhu me Portal</button>
             </div>
         </div>
-        
-        <div class="video-container">
-            <video id="videoPlayer" controls>
-                <source src="" type="video/mp4">
-                Shfletuesi juaj nuk mbështet videon.
-            </video>
-            <div class="loading" id="loading">Duke u lidhur...</div>
+
+        <div class="connection-info" id="connectionInfo" style="display: none;">
+            <h3>Informacion i Lidhjes</h3>
+            <div id="serverInfo"></div>
         </div>
-        
-        <div class="controls">
+
+        <div class="video-container">
+            <video id="videoPlayer" controls style="display: none;">
+                Shfletuesi juaj nuk mbështet videon HTML5.
+            </video>
+            <div class="loading" id="loading">Duke u lidhur me portal...</div>
+        </div>
+
+        <div class="controls" style="display: none;" id="playerControls">
             <button id="playBtn">Play</button>
             <button id="pauseBtn">Pause</button>
             <button id="fullscreenBtn">Fullscreen</button>
-            <button id="connectBtn">Lidhu me Server</button>
+            <button id="stopBtn">Stop</button>
         </div>
 
-        <div class="server-config">
-            <h3>Konfigurimi i Serverit</h3>
-            <div class="config-inputs">
-                <input type="text" id="serverUrl" placeholder="http://oceanstream.me:80/c/" value="http://oceanstream.me:80/c/">
-                <input type="text" id="macPrefix" placeholder="00:1B:79:DF:26:E7" value="00:1B:79:DF:26:E7" maxlength="8">
-                <button id="saveConfig">Ruaj Konfigurimin</button>
-            </div>
+        <div class="categories" id="categoriesContainer" style="display: none;">
+            <h3>Kategoritë</h3>
+            <div id="categoriesList"></div>
         </div>
-        
-        <div class="channel-list">
-            <h3>Kanale të Disponueshme</h3>
-            <div class="channels" id="channelsContainer">
-                <!-- Kanalet do të ngarkohen nga JavaScript -->
-            </div>
+
+        <div class="channels" id="channelsContainer" style="display: none;">
+            <h3>Kanale</h3>
+            <div id="channelsList"></div>
+        </div>
+
+        <div class="logs">
+            <h3>Logs</h3>
+            <div id="logContainer"></div>
         </div>
     </div>
 
