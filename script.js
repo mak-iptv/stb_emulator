@@ -1,259 +1,187 @@
-class IPTVPlayer {
+class M3UPlayer {
     constructor() {
-        this.channels = [];
-        this.currentChannel = null;
-        this.init();
+        this.playlist = [];
+        this.currentTrackIndex = 0;
+        this.audioPlayer = document.getElementById('audioPlayer');
+        this.playlistItems = document.getElementById('playlistItems');
+        this.isPlaying = false;
+
+        this.initializeEventListeners();
     }
 
-    init() {
-        this.setupEventListeners();
-        this.addSamplePlaylists();
-    }
-
-    setupEventListeners() {
-        document.getElementById('loadPlaylist').addEventListener('click', () => {
-            this.loadPlaylist();
-        });
-
+    initializeEventListeners() {
+        // Ngarko skedarin M3U
         document.getElementById('m3uFile').addEventListener('change', (e) => {
-            this.handleFileUpload(e);
+            this.loadM3UFile(e.target.files[0]);
         });
 
-        // Allow pressing Enter in URL field
-        document.getElementById('m3uUrl').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.loadPlaylist();
-            }
+        // Kontrollat e playerit
+        document.getElementById('playBtn').addEventListener('click', () => {
+            this.play();
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            this.pause();
+        });
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            this.previousTrack();
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            this.nextTrack();
+        });
+
+        document.getElementById('volumeSlider').addEventListener('input', (e) => {
+            this.audioPlayer.volume = e.target.value;
+        });
+
+        // Ndërhyrje kur përfundon një këngë
+        this.audioPlayer.addEventListener('ended', () => {
+            this.nextTrack();
+        });
+
+        // Përditësimi i kohës
+        this.audioPlayer.addEventListener('timeupdate', () => {
+            this.updateTime();
         });
     }
 
-    addSamplePlaylists() {
-        // Add some sample/test URLs for demonstration
-        const sampleUrls = [
-            'https://raw.githubusercontent.com/freearhey/iptv/master/channels/us.m3u',
-            'https://raw.githubusercontent.com/iptv-org/iptv/master/channels/us.m3u'
-        ];
-        
-        const urlInput = document.getElementById('m3uUrl');
-        urlInput.placeholder = 'Enter M3U URL or try a sample from GitHub';
-    }
-
-    async loadPlaylist() {
-        const urlInput = document.getElementById('m3uUrl');
-        const url = urlInput.value.trim();
-        const loadButton = document.getElementById('loadPlaylist');
-
-        if (!url) {
-            this.showError('Please enter M3U URL or select a file');
-            return;
-        }
-
-        // Show loading state
-        loadButton.textContent = 'Loading...';
-        loadButton.disabled = true;
-
-        try {
-            let m3uContent;
-            
-            if (url.startsWith('http')) {
-                // Add timestamp to avoid caching issues
-                const fetchUrl = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
-                
-                const response = await fetch(fetchUrl, {
-                    method: 'GET',
-                    mode: 'cors',
-                    headers: {
-                        'Content-Type': 'text/plain',
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                m3uContent = await response.text();
-                
-                // Check if content is actually M3U format
-                if (!m3uContent.includes('#EXTM3U')) {
-                    throw new Error('Not a valid M3U file (missing #EXTM3U header)');
-                }
-            } else {
-                this.showError('Please enter a valid HTTP/HTTPS URL');
-                return;
-            }
-
-            this.parseM3U(m3uContent);
-            this.displayChannels();
-            this.showSuccess(`Loaded ${this.channels.length} channels successfully!`);
-            
-        } catch (error) {
-            console.error('Error loading playlist:', error);
-            this.showError(`Error: ${error.message}. \n\nPossible solutions:\n• Check if the URL is accessible\n• Try a CORS proxy\n• Use a local file instead`);
-        } finally {
-            // Reset button state
-            loadButton.textContent = 'Load Playlist';
-            loadButton.disabled = false;
-        }
-    }
-
-    handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // Validate file type
-        if (!file.name.endsWith('.m3u') && !file.name.endsWith('.m3u8')) {
-            this.showError('Please select a valid M3U file (.m3u or .m3u8)');
-            return;
-        }
-
+    loadM3UFile(file) {
         const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                this.parseM3U(e.target.result);
-                this.displayChannels();
-                this.showSuccess(`Loaded ${this.channels.length} channels from file!`);
-            } catch (error) {
-                this.showError('Error parsing M3U file: ' + error.message);
-            }
-        };
         
-        reader.onerror = () => {
-            this.showError('Error reading file');
+        reader.onload = (e) => {
+            const content = e.target.result;
+            this.parseM3U(content);
+            this.renderPlaylist();
+            
+            if (this.playlist.length > 0) {
+                this.loadTrack(0);
+            }
         };
         
         reader.readAsText(file);
     }
 
     parseM3U(content) {
-        this.channels = [];
+        this.playlist = [];
         const lines = content.split('\n');
-        
-        let currentChannel = {};
-        let channelCount = 0;
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             
             if (line.startsWith('#EXTINF:')) {
-                const info = this.parseExtinf(line);
-                currentChannel = {
-                    name: info.name || `Channel ${channelCount + 1}`,
-                    logo: info.logo,
-                    group: info.group || 'General',
-                    id: channelCount
-                };
-            } else if (line && !line.startsWith('#') && currentChannel.name) {
-                currentChannel.url = line;
-                this.channels.push({...currentChannel});
-                channelCount++;
-                currentChannel = {};
+                const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
+                if (nextLine && !nextLine.startsWith('#')) {
+                    const trackInfo = this.parseExtinf(line);
+                    this.playlist.push({
+                        title: trackInfo.title,
+                        url: nextLine,
+                        duration: trackInfo.duration
+                    });
+                    i++; // Kalojmë linjën e URL-së
+                }
+            } else if (line && !line.startsWith('#') && line !== '') {
+                // Shto direkt URL pa metadata
+                this.playlist.push({
+                    title: `Track ${this.playlist.length + 1}`,
+                    url: line,
+                    duration: 0
+                });
             }
-        }
-        
-        if (this.channels.length === 0) {
-            throw new Error('No valid channels found in the playlist');
         }
     }
 
-    parseExtinf(line) {
-        try {
-            const match = line.match(/#EXTINF:(-?\d+)\s*(.*?),(.*)/);
-            if (!match) return { name: 'Unknown Channel' };
-
-            const attributes = match[2];
-            const name = match[3].trim();
-            
-            const logoMatch = attributes.match(/tvg-logo="([^"]*)"/);
-            const groupMatch = attributes.match(/group-title="([^"]*)"/);
-            
+    parseExtinf(extinfLine) {
+        const match = extinfLine.match(/#EXTINF:(-?\d+),(.*)/);
+        if (match) {
             return {
-                name: name,
-                logo: logoMatch ? logoMatch[1] : '',
-                group: groupMatch ? groupMatch[1] : 'General'
+                duration: parseInt(match[1]),
+                title: match[2]
             };
-        } catch (error) {
-            return { name: 'Unknown Channel', group: 'General' };
         }
+        return { duration: 0, title: 'Unknown Track' };
     }
 
-    displayChannels() {
-        const channelList = document.getElementById('channelList');
-        channelList.innerHTML = '';
-
-        if (this.channels.length === 0) {
-            channelList.innerHTML = '<div class="no-channels">No channels found</div>';
-            return;
-        }
-
-        this.channels.forEach((channel) => {
-            const channelElement = document.createElement('div');
-            channelElement.className = 'channel-item';
-            channelElement.innerHTML = `
-                <div class="channel-info">
-                    ${channel.logo ? `<img src="${channel.logo}" alt="" class="channel-logo" onerror="this.style.display='none'">` : ''}
-                    <div class="channel-details">
-                        <strong class="channel-name">${this.escapeHtml(channel.name)}</strong>
-                        <small class="channel-group">${this.escapeHtml(channel.group)}</small>
-                    </div>
-                </div>
-            `;
-            
-            channelElement.addEventListener('click', () => {
-                this.playChannel(channel);
+    renderPlaylist() {
+        this.playlistItems.innerHTML = '';
+        
+        this.playlist.forEach((track, index) => {
+            const li = document.createElement('li');
+            li.className = 'playlist-item';
+            li.textContent = track.title;
+            li.addEventListener('click', () => {
+                this.loadTrack(index);
             });
-            
-            channelList.appendChild(channelElement);
+            this.playlistItems.appendChild(li);
         });
     }
 
-    playChannel(channel) {
-        const videoPlayer = document.getElementById('videoPlayer');
-        const currentChannelElement = document.getElementById('currentChannel');
-        
-        currentChannelElement.textContent = `${channel.name} (${channel.group})`;
-        
-        // Show loading state
-        videoPlayer.classList.add('loading');
-        
-        videoPlayer.src = channel.url;
-        videoPlayer.load();
-        
-        videoPlayer.play().then(() => {
-            videoPlayer.classList.remove('loading');
-        }).catch(error => {
-            console.error('Error playing video:', error);
-            videoPlayer.classList.remove('loading');
+    loadTrack(index) {
+        if (index >= 0 && index < this.playlist.length) {
+            this.currentTrackIndex = index;
+            const track = this.playlist[index];
             
-            if (error.name === 'NotSupportedError') {
-                this.showError('This stream format is not supported by your browser. Try using VLC or another player.');
+            this.audioPlayer.src = track.url;
+            this.updateActiveTrack();
+            
+            // Përpiqemi të luajmë automatikisht
+            this.play().catch(e => {
+                console.log('Auto-play prevented:', e);
+            });
+        }
+    }
+
+    play() {
+        return this.audioPlayer.play().then(() => {
+            this.isPlaying = true;
+        });
+    }
+
+    pause() {
+        this.audioPlayer.pause();
+        this.isPlaying = false;
+    }
+
+    nextTrack() {
+        const nextIndex = (this.currentTrackIndex + 1) % this.playlist.length;
+        this.loadTrack(nextIndex);
+    }
+
+    previousTrack() {
+        const prevIndex = this.currentTrackIndex - 1;
+        this.loadTrack(prevIndex >= 0 ? prevIndex : this.playlist.length - 1);
+    }
+
+    updateActiveTrack() {
+        const items = this.playlistItems.querySelectorAll('.playlist-item');
+        items.forEach((item, index) => {
+            if (index === this.currentTrackIndex) {
+                item.classList.add('active');
             } else {
-                this.showError('Cannot play this channel. The stream might be offline or require specific codecs.');
+                item.classList.remove('active');
             }
         });
+    }
+
+    updateTime() {
+        const currentTime = document.getElementById('currentTime');
+        const duration = document.getElementById('duration');
         
-        this.currentChannel = channel;
+        currentTime.textContent = this.formatTime(this.audioPlayer.currentTime);
+        duration.textContent = this.formatTime(this.audioPlayer.duration);
     }
 
-    showError(message) {
-        alert('ERROR: ' + message);
-    }
-
-    showSuccess(message) {
-        // Could be replaced with a toast notification
-        console.log('SUCCESS: ' + message);
-    }
-
-    escapeHtml(unsafe) {
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+    formatTime(seconds) {
+        if (isNaN(seconds)) return '00:00';
+        
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 }
 
-// Initialize the player
+// Initialize player kur faja të jetë e gatshme
 document.addEventListener('DOMContentLoaded', () => {
-    new IPTVPlayer();
+    new M3UPlayer();
 });
