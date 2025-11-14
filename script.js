@@ -1,124 +1,151 @@
-class SimpleStalkerTester {
+class IPTVPlayer {
     constructor() {
-        this.elements = {
-            portalUrl: document.getElementById('portalUrl'),
-            macAddress: document.getElementById('macAddressInput'),
-            connectBtn: document.getElementById('connectBtn'),
-            status: document.getElementById('connectionStatus'),
-            logs: document.getElementById('logContainer')
-        };
-        
+        this.channels = [];
+        this.currentChannel = null;
         this.init();
     }
 
     init() {
-        this.elements.connectBtn.addEventListener('click', () => this.testConnection());
+        this.setupEventListeners();
     }
 
-    async testConnection() {
-        const portalUrl = this.elements.portalUrl.value;
-        const mac = this.elements.macAddress.value;
+    setupEventListeners() {
+        document.getElementById('loadPlaylist').addEventListener('click', () => {
+            this.loadPlaylist();
+        });
 
-        this.log('Duke testuar lidhjen...');
-        this.updateStatus('Testing');
-
-        // Test 1: Accessibility check
-        await this.testAccessibility(portalUrl);
-        
-        // Test 2: Handshake check
-        await this.testHandshake(portalUrl, mac);
+        document.getElementById('m3uFile').addEventListener('change', (e) => {
+            this.handleFileUpload(e);
+        });
     }
 
-    async testAccessibility(url) {
-        try {
-            this.log(`Duke kontrolluar: ${url}`);
-            
-            // Provoni me fetch të thjeshtë
-            const response = await fetch(url, {
-                method: 'HEAD',
-                mode: 'no-cors'
-            });
-            
-            this.log('✅ URL është e arritshme', 'success');
-            return true;
-        } catch (error) {
-            this.log(`❌ URL nuk është e arritshme: ${error.message}`, 'error');
-            return false;
+    async loadPlaylist() {
+        const urlInput = document.getElementById('m3uUrl');
+        const url = urlInput.value.trim();
+
+        if (!url) {
+            alert('Please enter M3U URL or select a file');
+            return;
         }
-    }
 
-    async testHandshake(portalUrl, mac) {
-        const handshakeUrl = `${portalUrl}/server/load.php?type=stb&action=handshake&token=&JsHttpRequest=1-xml`;
-        
-        this.log(`Duke provuar handshake: ${handshakeUrl}`);
-        
         try {
-            // Metoda 1: Fetch direkt
-            const response = await fetch(handshakeUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
-                    'MAC': mac
-                }
-            });
+            let m3uContent;
             
-            if (response.ok) {
-                const data = await response.json();
-                this.log('✅ Handshake i suksesshëm!', 'success');
-                this.updateStatus('Connected');
-                return data;
+            if (url.startsWith('http')) {
+                const response = await fetch(url);
+                m3uContent = await response.text();
             } else {
-                this.log(`❌ Handshake dështoi: ${response.status}`, 'error');
+                // Local file (already handled by file input)
+                return;
             }
+
+            this.parseM3U(m3uContent);
+            this.displayChannels();
         } catch (error) {
-            this.log(`❌ Gabim në handshake: ${error.message}`, 'error');
-            this.log('Duke provuar me proxy...');
-            
-            // Metoda 2: Proxy fallback
-            await this.tryWithProxy(handshakeUrl, mac);
+            console.error('Error loading playlist:', error);
+            alert('Error loading playlist. Please check the URL.');
         }
     }
 
-    async tryWithProxy(url, mac) {
-        const proxies = [
-            'https://cors-anywhere.herokuapp.com/',
-            'https://api.codetabs.com/v1/proxy?quest=',
-            'https://cors.bridged.cc/'
-        ];
+    handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
 
-        for (const proxy of proxies) {
-            try {
-                this.log(`Duke provuar proxy: ${proxy}`);
-                
-                const response = await fetch(proxy + url, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3',
-                        'MAC': mac
-                    }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    this.log('✅ Handshake i suksesshëm me proxy!', 'success');
-                    this.updateStatus('Connected via Proxy');
-                    return data;
-                }
-            } catch (proxyError) {
-                this.log(`Proxy dështoi: ${proxy}`, 'error');
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.parseM3U(e.target.result);
+            this.displayChannels();
+        };
+        reader.readAsText(file);
+    }
+
+    parseM3U(content) {
+        this.channels = [];
+        const lines = content.split('\n');
+        
+        let currentChannel = {};
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            if (line.startsWith('#EXTINF:')) {
+                // Parse channel info
+                const info = this.parseExtinf(line);
+                currentChannel = {
+                    name: info.name,
+                    logo: info.logo,
+                    group: info.group
+                };
+            } else if (line && !line.startsWith('#') && currentChannel.name) {
+                // This is the URL line
+                currentChannel.url = line;
+                this.channels.push({...currentChannel});
+                currentChannel = {};
             }
         }
         
-        this.log('❌ Të gjitha proxy-t dështuan', 'error');
-        this.updateStatus('Failed');
+        console.log('Parsed channels:', this.channels);
     }
 
-    log(message, type = 'info') {
-        const logEntry = document.createElement('div');
-        logEntry.className = `log-${type}`;
-        logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        this.elements.logs.appendChild(logEntry);
+    parseExtinf(line) {
+        // Parse #EXTINF line with various attributes
+        const match = line.match(/#EXTINF:(-?\d+)\s*(.*?),(.*)/);
+        if (!match) return { name: 'Unknown' };
+
+        const attributes = match[2];
+        const name = match[3].trim();
+        
+        // Extract logo and group from attributes
+        const logoMatch = attributes.match(/tvg-logo="([^"]*)"/);
+        const groupMatch = attributes.match(/group-title="([^"]*)"/);
+        
+        return {
+            name: name,
+            logo: logoMatch ? logoMatch[1] : '',
+            group: groupMatch ? groupMatch[1] : 'General'
+        };
     }
 
-    updateStatus(status) {
-        this.elements.status.textContent = status;
+    displayChannels() {
+        const channelList = document.getElementById('channelList');
+        channelList.innerHTML = '';
+
+        this.channels.forEach((channel, index) => {
+            const channelElement = document.createElement('div');
+            channelElement.className = 'channel-item';
+            channelElement.innerHTML = `
+                <strong>${channel.name}</strong>
+                ${channel.group ? `<br><small>${channel.group}</small>` : ''}
+            `;
+            
+            channelElement.addEventListener('click', () => {
+                this.playChannel(channel);
+            });
+            
+            channelList.appendChild(channelElement);
+        });
+    }
+
+    playChannel(channel) {
+        const videoPlayer = document.getElementById('videoPlayer');
+        const currentChannelElement = document.getElementById('currentChannel');
+        
+        currentChannelElement.textContent = channel.name;
+        
+        // Try to play the stream
+        videoPlayer.src = channel.url;
+        videoPlayer.load();
+        
+        videoPlayer.play().catch(error => {
+            console.error('Error playing video:', error);
+            alert('Error playing this channel. It might be incompatible or require specific codecs.');
+        });
+        
+        this.currentChannel = channel;
     }
 }
+
+// Initialize the player when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new IPTVPlayer();
+});
