@@ -1,82 +1,386 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="sq">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extream TV Player</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IPTV M3U Player — Kompleti (HTML/CSS/JS)</title>
+  <meta name="description" content="IPTV player me menaxhim playlist, EPG (XMLTV), STB remote fokus, ruajtje lokale dhe opsione PWA - single file" />
+  <style>
+    :root{--bg:#071026;--card:#0b1220;--muted:#94a3b8;--accent:#06b6d4;--glass:rgba(255,255,255,0.03)}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background:linear-gradient(180deg,#021022 0%, #041428 100%);color:#e6eef6}
+    .app{max-width:1200px;margin:18px auto;padding:18px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between}
+    h1{font-size:18px;margin:0}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    input[type=text], select{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:inherit}
+    button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#032;cursor:pointer}
+    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    main{display:grid;grid-template-columns:380px 1fr;gap:14px;margin-top:14px}
+    .card{background:var(--card);padding:12px;border-radius:12px}
+    .player{background:#000;border-radius:8px;overflow:hidden}
+    video{width:100%;height:360px;display:block;background:#000}
+    .list{margin-top:12px;max-height:420px;overflow:auto}
+    .ch{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer}
+    .ch[data-focused="true"]{outline:2px solid rgba(6,182,212,0.18);background:rgba(6,182,212,0.02)}
+    .ch img{width:64px;height:36px;object-fit:cover;border-radius:4px}
+    .meta{flex:1}
+    .meta b{display:block}
+    .search{margin-top:8px}
+    .foot{margin-top:10px;font-size:13px;color:var(--muted)}
+    .big-controls{display:flex;gap:8px;margin-top:8px}
+    .kbd{background:#081226;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03);font-size:13px}
+    .mgr{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+    .epg{margin-top:12px;border-radius:8px;padding:8px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent)}
+    .epg-item{padding:6px;border-radius:6px}
+    .hidden{display:none}
+    @media(max-width:960px){main{grid-template-columns:1fr}video{height:220px}}
+  </style>
 </head>
 <body>
-    <div class="player-container">
-        <h1>🎬 Extream TV Player</h1>
-        
-        <div class="upload-section">
-            <input type="file" id="m3uFile" accept=".m3u,.m3u8">
-            <label for="m3uFile" class="upload-btn">Ngarko skedarin M3U</label>
-            <button id="loadExtream" class="extream-btn">Extream URL</button>
-        </div>
+  <div class="app">
+    <header>
+      <div>
+        <h1>IPTV M3U Player — Kompleti</h1>
+        <div style="color:var(--muted);font-size:13px">Ngarko playlist, ruaj, shiko EPG (XMLTV), përdor fokusin STB</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="installBtn" class="ghost hidden">Instalo (PWA)</button>
+        <button id="exportAll" class="ghost">Eksporto playlist</button>
+      </div>
+    </header>
 
-        <!-- Extream URL Modal -->
-        <div id="extreamModal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h3>Extream URL</h3>
-                <input type="text" id="extreamUrl" placeholder="https://example.com/playlist.m3u">
-                <button id="loadUrlBtn">Ngarko URL</button>
-            </div>
-        </div>
-
-        <div class="player">
-            <video id="videoPlayer" controls>
-                <source src="" type="video/mp4">
-                Shfletuesi juaj nuk mbështet elementin video.
-            </video>
-            
-            <div class="controls">
-                <button id="prevBtn">⏮️ Paraardhës</button>
-                <button id="playBtn">▶️ Luaj</button>
-                <button id="pauseBtn">⏸️ Pauzë</button>
-                <button id="nextBtn">⏭️ Tjetër</button>
-                <button id="fullscreenBtn">⛶ Ekran i Plotë</button>
-            </div>
-
-            <div class="player-controls">
-                <span id="currentTime">00:00:00</span>
-                <input type="range" id="progressBar" min="0" max="100" value="0">
-                <span id="duration">00:00:00</span>
-                
-                <div class="volume-control">
-                    <span>🔊</span>
-                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1">
-                </div>
-            </div>
-        </div>
-
-        <div class="categories">
-            <h3>🌍 Kategoritë e Shteteve</h3>
-            <div class="category-filters" id="categoryFilters">
-                <!-- Kategoritë do të gjenerohen automatikisht -->
-            </div>
-        </div>
-
-        <div class="playlist-container">
-            <div class="playlist-header">
-                <h3>📺 Lista e Kanaleve (<span id="channelCount">0</span>)</h3>
-                <div class="search-box">
-                    <input type="text" id="searchInput" placeholder="🔍 Kërko kanale...">
-                </div>
-            </div>
-            <ul id="playlistItems"></ul>
-        </div>
-        <div class="alternative-section">
-    <h4>Zgjidhje Alternative:</h4>
-    <p>1. Shkarkoni skedarin M3U dhe ngarkojeni lokal</p>
-    <p>2. Përdorni extension për CORS në shfletues</p>
-    <p>3. Përdorni server lokal për të shmangur CORS</p>
-</div>
+    <div class="controls">
+      <input id="m3uUrl" type="text" placeholder="Ngjit URL e playlist M3U ose HLS (.m3u8)" style="min-width:420px" />
+      <button id="loadUrl">Ngarko nga URL</button>
+      <label class="ghost" style="display:inline-block;padding:8px 10px;border-radius:8px;cursor:pointer">
+        Ngarko skedarin M3U
+        <input id="fileInput" type="file" accept=".m3u,.txt" style="display:none">
+      </label>
+      <label class="ghost" style="display:inline-block;padding:8px 10px;border-radius:8px;cursor:pointer">
+        Ngarko XMLTV (EPG)
+        <input id="xmlFile" type="file" accept=".xml,.xmltv" style="display:none">
+      </label>
+      <select id="savedPlaylists">
+        <option value="">-- Playlists e ruajtura --</option>
+      </select>
+      <button id="savePlaylist" class="ghost">Ruaj</button>
+      <button id="deletePlaylist" class="ghost">Fshi</button>
     </div>
 
+    <main>
+      <section class="left card">
+        <div class="player">
+          <video id="video" controls playsinline></video>
+        </div>
+        <div class="big-controls">
+          <button id="playPause">Play/Pause</button>
+          <button id="prev" class="ghost">Prev</button>
+          <button id="next" class="ghost">Next</button>
+          <button id="volDown" class="ghost">Vol -</button>
+          <button id="volUp" class="ghost">Vol +</button>
+          <button id="pip" class="ghost">PIP</button>
+        </div>
+        <div class="mgr">
+          <input id="filter" class="search" placeholder="Filtro: kërko emrin..." />
+          <input id="sort" type="checkbox" /> <label for="sort">Rendit alfabetik</label>
+        </div>
+        <div class="foot">Kontrollet: <span class="kbd">Space</span> play/pause, <span class="kbd">/</span> fokus filtro, <span class="kbd">Arrow</span> lëviz me STB, <span class="kbd">Enter</span> luaj</div>
+      </section>
 
-    <script src="script.js"></script>
+      <section class="right">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>Lista e kanaleve</strong>
+            <div style="font-size:13px;color:var(--muted)" id="count">0 kanale</div>
+          </div>
+
+          <div id="list" class="list" tabindex="0" style="margin-top:8px"></div>
+
+          <div class="epg hidden" id="epgBox">
+            <strong>EPG (kanali i zgjedhur)</strong>
+            <div id="epgList"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div style="max-width:1200px;margin-top:12px;color:var(--muted);font-size:13px">
+      <p>Shënim: Shfletuesi duhet të lejojë CORS për të ngarkuar playlist nga domain i huaj. Disa streams nuk luajnë direkt në shfletues (nevojitet transcoding / server). Përdor me kujdes stream-et komerciale dhe respekto ligjin.</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    // --- Utility: M3U parser (improved) ---
+    function parseM3U(text){
+      const lines = text.split(/\r?\n/);
+      const items = [];
+      let currentInfo = null;
+      for(let raw of lines){
+        const line = raw.trim();
+        if(!line) continue;
+        if(line.startsWith('#EXTINF')){
+          currentInfo = {raw: line};
+        } else if(line.startsWith('#')){
+          // ignore other tags for now
+        } else {
+          // it's a URL
+          const url = line;
+          if(currentInfo){
+            // parse attributes and name
+            const info = currentInfo.raw.substring(8);
+            const attrs = {};
+            const attrRegex = /(\w[\w-]*?)\s*=\s*"([^"]*)"/g;
+            let m;
+            while((m = attrRegex.exec(info)) !== null) attrs[m[1]] = m[2];
+            const comma = info.indexOf(',');
+            const name = comma !== -1 ? info.substring(comma+1).trim() : (attrs.title || url);
+            items.push({name,logo:attrs['tvg-logo']||attrs.logo||'',url});
+            currentInfo = null;
+          } else {
+            items.push({name: url, logo: '', url});
+          }
+        }
+      }
+      return items;
+    }
+
+    // --- XMLTV parser (very small, tolerant) ---
+    function parseXMLTV(xmlText){
+      // naive xml parsing using DOMParser
+      try{
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(xmlText, 'application/xml');
+        const progNodes = Array.from(doc.getElementsByTagName('programme'));
+        const epg = {};
+        progNodes.forEach(p => {
+          const ch = p.getAttribute('channel');
+          const start = p.getAttribute('start');
+          const stop = p.getAttribute('stop');
+          const titleNode = p.getElementsByTagName('title')[0];
+          const title = titleNode ? titleNode.textContent : '—';
+          if(!epg[ch]) epg[ch] = [];
+          epg[ch].push({start,stop,title});
+        });
+        // sort by start
+        Object.keys(epg).forEach(k => epg[k].sort((a,b)=> a.start.localeCompare(b.start)));
+        return epg;
+      } catch(e){ console.warn('XMLTV parse error', e); return {}; }
+    }
+
+    // --- App state ---
+    const listEl = document.getElementById('list');
+    const video = document.getElementById('video');
+    const m3uUrl = document.getElementById('m3uUrl');
+    const filter = document.getElementById('filter');
+    const savedSelect = document.getElementById('savedPlaylists');
+    const epgBox = document.getElementById('epgBox');
+    const epgList = document.getElementById('epgList');
+
+    let items = [];
+    let currentIndex = -1;
+    let epgData = {}; // {channelId: [{start,stop,title},...]}
+    let hlsIns = null;
+
+    // --- Render ---
+    function renderList(){
+      const q = filter.value.trim().toLowerCase();
+      let out = items.slice();
+      if(document.getElementById('sort').checked) out.sort((a,b)=> a.name.localeCompare(b.name));
+      out = out.filter(it => it.name.toLowerCase().includes(q));
+      listEl.innerHTML = '';
+      out.forEach((it, idx) =>{
+        const row = document.createElement('div'); row.className='ch'; row.tabIndex = 0;
+        row.dataset.idx = idx;
+        const img = document.createElement('img'); img.src = it.logo || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="100%" height="100%" fill="#081a26"/></svg>';
+        const meta = document.createElement('div'); meta.className='meta';
+        meta.innerHTML = `<b>${escapeHtml(it.name)}</b><small style="color:var(--muted)">${escapeHtml(it.url)}</small>`;
+        row.appendChild(img); row.appendChild(meta);
+        row.addEventListener('click', ()=> playByIndex(idx));
+        row.addEventListener('keydown', (e)=>{
+          if(e.key === 'Enter') { playByIndex(idx); }
+        });
+        listEl.appendChild(row);
+      });
+      document.getElementById('count').textContent = out.length + ' kanale';
+      // ensure focus index mapping
+      focusedIndex = 0; updateFocus();
+    }
+
+    function escapeHtml(s){ return String(s||'').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]||c)); }
+
+    // --- Play logic ---
+    function playByIndex(idx){
+      const visible = visibleItems();
+      const it = visible[idx];
+      if(!it) return;
+      currentIndex = items.indexOf(it);
+      playItem(it);
+      showEPGFor(it);
+    }
+
+    function visibleItems(){
+      const q = filter.value.trim().toLowerCase();
+      let out = items.slice();
+      if(document.getElementById('sort').checked) out.sort((a,b)=> a.name.localeCompare(b.name));
+      out = out.filter(it => it.name.toLowerCase().includes(q));
+      return out;
+    }
+
+    function playItem(it){
+      const src = it.url;
+      if(!src) return alert('URL i kanalit mungon');
+      // HLS handling
+      if(src.indexOf('.m3u8') !== -1){
+        if(window.Hls && Hls.isSupported()){
+          if(hlsIns){ hlsIns.destroy(); hlsIns = null; }
+          hlsIns = new Hls();
+          hlsIns.loadSource(src);
+          hlsIns.attachMedia(video);
+          hlsIns.on(Hls.Events.MANIFEST_PARSED, ()=> video.play().catch(()=>{}));
+        } else {
+          video.src = src; video.play().catch(()=>{});
+        }
+      } else {
+        video.src = src; video.play().catch(()=>{ alert('Ky stream mund të mos luajë direkt në shfletues.'); });
+      }
+    }
+
+    // --- EPG ---
+    function showEPGFor(it){
+      epgList.innerHTML = '';
+      epgBox.classList.add('hidden');
+      // try to find matching epg key by channel name or url
+      const keys = Object.keys(epgData);
+      if(!keys.length) return;
+      // simple matching: channel id equals tvg-id or name
+      const name = (it.name || '').toLowerCase();
+      let foundKey = keys.find(k => k.toLowerCase().includes(name) || name.includes(k.toLowerCase()));
+      if(!foundKey){
+        // try match by url
+        foundKey = keys.find(k => it.url && it.url.includes(k));
+      }
+      if(!foundKey) return;
+      const list = epgData[foundKey] || [];
+      if(!list.length) return;
+      epgBox.classList.remove('hidden');
+      list.slice(0,10).forEach(ev =>{
+        const d = document.createElement('div'); d.className='epg-item';
+        d.innerHTML = `<div style="font-weight:600">${escapeHtml(ev.title)}</div><div style="color:var(--muted);font-size:13px">${formatXMLTVTime(ev.start)} — ${formatXMLTVTime(ev.stop)}</div>`;
+        epgList.appendChild(d);
+      });
+    }
+    function formatXMLTVTime(t){ if(!t) return '-'; return t.replace(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2}).*/,'$3-$2-$1 $4:$5'); }
+
+    // --- File loading ---
+    async function loadFromUrl(url){
+      try{
+        const res = await fetch(url);
+        if(!res.ok) throw new Error('Network '+res.status);
+        const text = await res.text();
+        items = parseM3U(text);
+        renderList();
+        if(items.length) playItem(items[0]);
+      }catch(err){ alert('Gabim: '+err.message+' (CORS mund të bllokojë fetch)'); }
+    }
+    function loadFromFile(file){
+      const r = new FileReader();
+      r.onload = e => { items = parseM3U(e.target.result); renderList(); if(items.length) playItem(items[0]); };
+      r.readAsText(file);
+    }
+    document.getElementById('fileInput').addEventListener('change', e => { const f = e.target.files[0]; if(f) loadFromFile(f); });
+
+    // XMLTV
+    document.getElementById('xmlFile').addEventListener('change', e => { const f = e.target.files[0]; if(!f) return; const r = new FileReader(); r.onload = ev => { epgData = parseXMLTV(ev.target.result); alert('EPG u ngarkua ('+Object.keys(epgData).length+' kanale)'); }; r.readAsText(f); });
+
+    // --- Playlist save/load (localStorage) ---
+    const STORAGE_KEY = 'iptv_playlists_v1';
+    function readStorage(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); }catch(e){return {};}}
+    function writeStorage(obj){ localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); }
+
+    function refreshSavedSelect(){ const s = readStorage(); savedSelect.innerHTML = '<option value="">-- Playlists e ruajtura --</option>'; Object.keys(s).forEach(k => { const opt = document.createElement('option'); opt.value = k; opt.textContent = k + ' ('+s[k].length+' kanale)'; savedSelect.appendChild(opt); }); }
+    document.getElementById('savePlaylist').addEventListener('click', ()=>{
+      const name = prompt('Emëro playlist (pa karaktere speciale):'); if(!name) return;
+      const s = readStorage(); s[name] = items; writeStorage(s); refreshSavedSelect(); alert('Ruajtur.');
+    });
+    document.getElementById('deletePlaylist').addEventListener('click', ()=>{
+      const key = savedSelect.value; if(!key) return alert('Zgjidh playlist për të fshirë'); if(!confirm('Fshi '+key+'?')) return; const s = readStorage(); delete s[key]; writeStorage(s); refreshSavedSelect(); alert('Fshirë.');
+    });
+    savedSelect.addEventListener('change', ()=>{
+      const key = savedSelect.value; if(!key) return; const s = readStorage(); items = s[key] || []; renderList(); if(items.length) playItem(items[0]);
+    });
+    document.getElementById('exportAll').addEventListener('click', ()=>{
+      const blob = new Blob([ stringifyM3U(items) ], {type:'text/plain'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'playlist_export.m3u'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    function stringifyM3U(arr){ let out = '#EXTM3U\n'; arr.forEach(it => out += `#EXTINF:-1 tvg-logo="${it.logo||''}",${it.name}\n${it.url}\n`); return out; }
+
+    // --- Player controls ---
+    document.getElementById('loadUrl').addEventListener('click', ()=>{ const url = m3uUrl.value.trim(); if(!url) return alert('Vendos URL'); loadFromUrl(url); });
+    document.getElementById('playPause').addEventListener('click', ()=> video.paused ? video.play() : video.pause());
+    document.getElementById('volUp').addEventListener('click', ()=> video.volume = Math.min(1, video.volume + 0.1));
+    document.getElementById('volDown').addEventListener('click', ()=> video.volume = Math.max(0, video.volume - 0.1));
+    document.getElementById('prev').addEventListener('click', ()=>{ if(currentIndex>0) playByIndex(currentIndex-1); });
+    document.getElementById('next').addEventListener('click', ()=>{ if(currentIndex < items.length-1) playByIndex(currentIndex+1); });
+    document.getElementById('pip').addEventListener('click', async ()=>{ if(document.pictureInPictureElement){ await document.exitPictureInPicture(); } else { try{ await video.requestPictureInPicture(); }catch(e){ alert('PIP nuk mbështetet: '+e.message); } } });
+
+    filter.addEventListener('input', ()=> renderList());
+    document.getElementById('sort').addEventListener('change', ()=> renderList());
+
+    // --- Keyboard & STB remote navigation ---
+    let focusedIndex = 0; // index within visibleItems()
+    function updateFocus(){ const nodes = Array.from(listEl.children); nodes.forEach((n,i)=>{ n.dataset.focused = (i===focusedIndex); if(i===focusedIndex){ n.scrollIntoView({block:'nearest'}); n.focus(); } }); }
+
+    window.addEventListener('keydown', (e)=>{
+      if(e.code === 'Space' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
+      if(e.key === '/') { e.preventDefault(); filter.focus(); }
+      if(e.key === 'ArrowUp') { e.preventDefault(); focusedIndex = Math.max(0, focusedIndex-1); updateFocus(); }
+      if(e.key === 'ArrowDown') { e.preventDefault(); focusedIndex = Math.min(Math.max(0, listEl.children.length-1), focusedIndex+1); updateFocus(); }
+      if(e.key === 'Enter'){ e.preventDefault(); const v = visibleItems(); if(v[focusedIndex]) playItem(v[focusedIndex]); }
+      if(e.key === 'ArrowLeft'){ video.currentTime = Math.max(0, video.currentTime - 10); }
+      if(e.key === 'ArrowRight'){ video.currentTime = Math.min(video.duration||Infinity, video.currentTime + 10); }
+    });
+
+    // ensure focus updates when list rebuilt
+    const obs = new MutationObserver(()=> updateFocus()); obs.observe(listEl, {childList:true});
+
+    // --- Persistence: load saved list names ---
+    refreshSavedSelect();
+
+    // --- Small helpers: try load example if empty (commented out) ---
+    // loadFromUrl('https://demo-cdn.example/playlist.m3u');
+
+    // --- PWA install prompt (generate manifest + service worker via blob) ---
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; document.getElementById('installBtn').classList.remove('hidden'); });
+    document.getElementById('installBtn').addEventListener('click', async ()=>{ if(!deferredPrompt) return; deferredPrompt.prompt(); const choice = await deferredPrompt.userChoice; deferredPrompt = null; document.getElementById('installBtn').classList.add('hidden'); });
+
+    // create manifest blob and link
+    (function createManifest(){
+      const m = { name:'IPTV Player - Kompleti', short_name:'IPTV', start_url:'.', display:'standalone', background_color:'#021022', icons:[{src:'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"192\" height=\"192\"><rect width=\"100%\" height=\"100%\" fill=\"#06b6d4\"/><text x=\"50%\" y=\"50%\" dominant-baseline=\"middle\" text-anchor=\"middle\" font-size=\"72\" fill=\"#012\" font-family=\"Arial\">TV</text></svg>', sizes:'192x192', type:'image/svg+xml'}] };
+      const blob = new Blob([JSON.stringify(m)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const l = document.createElement('link'); l.rel = 'manifest'; l.href = url; document.head.appendChild(l);
+    })();
+
+    // register a minimal service worker to enable offline caching of the page shell (optional)
+    (function registerSW(){
+      if('serviceWorker' in navigator){
+        const swCode = `self.addEventListener('install', e=>{ self.skipWaiting(); }); self.addEventListener('fetch', e=>{});`;
+        const blob = new Blob([swCode], {type:'application/javascript'});
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch(()=>{});
+      }
+    })();
+
+    // --- init focus on list container ---
+    listEl.addEventListener('focus', ()=> updateFocus());
+    // initial empty render
+    renderList();
+  </script>
 </body>
 </html>
