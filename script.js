@@ -1,201 +1,278 @@
-class ExtreamTVPlayer {
-    constructor() {
-        // ... kodi ekzistues ...
-        
-        this.corsProxies = [
-            'https://api.codetabs.com/v1/proxy?quest=',
-            'https://corsproxy.org/?',
-            'https://api.allorigins.win/get?url='
-        ];
-
-        this.initializeEventListeners();
+    /********** VARIABILI GLOBALI & FUNZIONI PER PLAYER / CANALI **********/
+    /*********************** Author: Bocaletto Luca ***********************/
+    let hls; // Istanza globale per Hls.js
+    const video = document.getElementById("videoPlayer");
+    const spinner = document.getElementById("spinner");
+    const channelsContainer = document.getElementById("channelsContainer");
+    const fileInput = document.getElementById("m3uFile");
+    
+    let channels = []; // Array degli elementi canale
+    let currentSelectedIndex = -1;
+    
+    function showSpinner(show = true) {
+      spinner.style.display = show ? "flex" : "none";
     }
-
-    // ... kodi ekzistues ...
-
-    async loadExtreamUrl() {
-        const url = document.getElementById('extreamUrl').value.trim();
-        if (!url) {
-            alert('Ju lutem shkruani një URL!');
-            return;
-        }
-
-        if (!url.startsWith('http')) {
-            alert('URL duhet të fillojë me http:// ose https://');
-            return;
-        }
-
-        this.showLoadingMessage('Duke ngarkuar nga Extream URL...');
-
-        try {
-            // Provim me proxy të ndryshme
-            let content = '';
-            let success = false;
-
-            for (const proxy of this.corsProxies) {
-                try {
-                    console.log(`Duke provuar proxy: ${proxy}`);
-                    const proxyUrl = proxy === 'https://api.allorigins.win/get?url=' 
-                        ? `${proxy}${encodeURIComponent(url)}`
-                        : `${proxy}${encodeURIComponent(url)}`;
-                    
-                    const response = await fetch(proxyUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'text/plain,application/x-mpegURL,*/*'
-                        },
-                        timeout: 10000
-                    });
-
-                    if (response.ok) {
-                        if (proxy.includes('api.allorigins.win')) {
-                            const data = await response.json();
-                            content = data.contents;
-                        } else {
-                            content = await response.text();
-                        }
-                        
-                        success = true;
-                        console.log('URL u ngarkua me sukses me proxy:', proxy);
-                        break;
-                    }
-                } catch (error) {
-                    console.log(`Proxy ${proxy} dështoi:`, error);
-                    continue;
-                }
-            }
-
-            if (!success) {
-                // Provim direkt pa proxy (për URL që nuk kanë CORS)
-                try {
-                    console.log('Duke provuar direkt pa proxy...');
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        mode: 'no-cors',
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                        }
-                    });
-                    
-                    // Nëse kjo nuk hedh error, provojmë të përdorim URL direkt
-                    content = `#EXTM3U\n#EXTINF:-1,Direct Stream\n${url}`;
-                    console.log('Duke përdorur URL direkt');
-                } catch (directError) {
-                    throw new Error('Të gjitha proxy-t dështuan dhe direkt nuk funksionon');
-                }
-            }
-
-            if (!content) {
-                throw new Error('Nuk u gjet përmbajtje nga URL');
-            }
-
-            this.parseM3U(content);
-            this.filteredPlaylist = [...this.playlist];
-            this.renderCategories();
-            this.renderPlaylist();
-            this.closeExtreamModal();
-            
-            if (this.playlist.length > 0) {
-                this.loadTrack(0);
-            } else {
-                this.showErrorMessage('Nuk u gjetën kanale në këtë URL');
-            }
-            
-            this.hideLoadingMessage();
-            
-        } catch (error) {
-            console.error('Error loading Extream URL:', error);
-            this.hideLoadingMessage();
-            this.showErrorMessage(`Gabim gjatë ngarkimit: ${error.message}`);
-        }
+    
+    function playChannel(streamUrl) {
+      console.log("Caricamento stream: " + streamUrl);
+      showSpinner(true);
+      
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+      
+      if (Hls.isSupported()) {
+        hls = new Hls({ enableWorker: true });
+        hls.loadSource(streamUrl);
+        hls.attachMedia(video);
+        hls.once(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().then(() => {
+            showSpinner(false);
+          }).catch(err => {
+            console.error("Errore nel play:", err);
+            showSpinner(false);
+          });
+        });
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error("Errore HLS:", data);
+          showSpinner(false);
+        });
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = streamUrl;
+        video.play().then(() => {
+          showSpinner(false);
+        }).catch(err => {
+          console.error("Errore nel play (nativo):", err);
+          showSpinner(false);
+        });
+      } else {
+        alert("Il tuo browser non supporta lo streaming HLS.");
+        showSpinner(false);
+      }
     }
-
-    // Metodë alternative për URL të thjeshta
-    async loadDirectUrl() {
-        const url = document.getElementById('extreamUrl').value.trim();
-        
-        // Krijo një playlist të thjeshtë me URL-në e dhënë
-        this.playlist = [{
-            title: 'Extream Stream',
-            url: url,
-            duration: 0,
-            group: 'Extream',
-            logo: '',
-            country: 'International',
-            countryCode: '🌍',
-            rawUrl: url
-        }];
-        
-        this.filteredPlaylist = [...this.playlist];
-        this.renderCategories();
-        this.renderPlaylist();
-        this.closeExtreamModal();
-        
-        if (this.playlist.length > 0) {
-            this.loadTrack(0);
+    
+    function parseChannelList(content) {
+      const lines = content.split("\n");
+      channelsContainer.innerHTML = "";
+      channels = [];
+      currentSelectedIndex = -1;
+      let currentTitle = "";
+      lines.forEach(line => {
+        line = line.trim();
+        if (!line) return;
+        if (line.startsWith("#EXTINF")) {
+          // Estrae il titolo dal testo dopo la virgola (fallback "Canale IPTV")
+          const match = line.match(/,(.*)$/);
+          currentTitle = match ? match[1].trim() : "Canale IPTV";
+        } else if (line.startsWith("http")) {
+          const streamUrl = line;
+          const channelDiv = document.createElement("div");
+          channelDiv.className = "channel";
+          channelDiv.textContent = currentTitle;
+          channelDiv.addEventListener("click", function() {
+            playChannel(streamUrl);
+            currentSelectedIndex = channels.indexOf(channelDiv);
+            updateSelection();
+          });
+          channelsContainer.appendChild(channelDiv);
+          channels.push(channelDiv);
         }
+      });
     }
-
-    // Shto buton alternative në modal
-    openExtreamModal() {
-        document.getElementById('extreamModal').style.display = 'block';
-        // Shto buton alternative
-        setTimeout(() => {
-            if (!document.getElementById('directLoadBtn')) {
-                const directBtn = document.createElement('button');
-                directBtn.id = 'directLoadBtn';
-                directBtn.textContent = 'Ngarko Direkt (Nëse Proxy Dështon)';
-                directBtn.style.cssText = `
-                    margin-top: 10px;
-                    padding: 10px;
-                    background: #f39c12;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    width: 100%;
-                `;
-                directBtn.addEventListener('click', () => {
-                    this.loadDirectUrl();
-                });
-                document.querySelector('.modal-content').appendChild(directBtn);
-            }
-        }, 100);
+    
+    // Event listener per il file input: il file scelto dall'utente viene letto e parsato
+    fileInput.addEventListener("change", function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const content = e.target.result;
+        parseChannelList(content);
+      };
+      reader.readAsText(file);
+    });
+    
+    function updateSelection() {
+      channels.forEach((channel, index) => {
+        if (index === currentSelectedIndex) {
+          channel.classList.add("selected");
+          channel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        } else {
+          channel.classList.remove("selected");
+        }
+      });
     }
-
-    // ... pjesa tjetër e kodit ...
-}
-async loadExtreamUrl() {
-    const url = document.getElementById('extreamUrl').value.trim();
-    if (!url) {
-        alert('Ju lutem shkruani një URL!');
+    
+    /********** EVENTI DA TASTIERA **********/
+    document.addEventListener("keydown", function(e) {
+      // Se l'utente preme "l", simula un click sul file input per ricaricare la lista
+      if (e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        fileInput.click();
         return;
-    }
-
-    this.showLoadingMessage('Duke ngarkuar...');
-
-    try {
-        // Krijo një skedar M3U virtual me URL-në e dhënë
-        const virtualM3U = `#EXTM3U
-#EXTINF:-1 tvg-id="extream1" tvg-name="Extream Stream 1" tvg-logo="" group-title="Extream",Extream Stream 1
-${url}`;
-
-        this.parseM3U(virtualM3U);
-        this.filteredPlaylist = [...this.playlist];
-        this.renderCategories();
-        this.renderPlaylist();
-        this.closeExtreamModal();
-        
-        if (this.playlist.length > 0) {
-            this.loadTrack(0);
-            this.showErrorMessage('URL u ngarkua! Nëse nuk punon, provoni direkt në VLC.');
+      }
+      
+      // Navigazione nella lista dei canali
+      if (channels.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          currentSelectedIndex = (currentSelectedIndex + 1) % channels.length;
+          updateSelection();
+          return;
         }
-        
-        this.hideLoadingMessage();
-        
-    } catch (error) {
-        console.error('Error:', error);
-        this.hideLoadingMessage();
-        this.showErrorMessage('Provoni direkt në VLC ose shfletues tjetër');
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          currentSelectedIndex = (currentSelectedIndex - 1 + channels.length) % channels.length;
+          updateSelection();
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (currentSelectedIndex >= 0 && currentSelectedIndex < channels.length) {
+            channels[currentSelectedIndex].click();
+          }
+          return;
+        }
+      }
+      
+      // Controlli del player via tastiera
+      if (e.key === " ") { // Space per pausa/ripresa
+         e.preventDefault();
+         video.paused ? video.play() : video.pause();
+      } else if (e.key === "+" || e.key === "=") { // Volume su
+         e.preventDefault();
+         video.volume = Math.min(video.volume + 0.1, 1);
+      } else if (e.key === "-") { // Volume giù
+         e.preventDefault();
+         video.volume = Math.max(video.volume - 0.1, 0);
+      } else if (e.key.toLowerCase() === "m") { // Toggle mute
+         e.preventDefault();
+         video.muted = !video.muted;
+      } else if (e.key.toLowerCase() === "f") { // Fullscreen toggle
+         e.preventDefault();
+         if (!document.fullscreenElement) {
+            video.requestFullscreen ? video.requestFullscreen() : (video.webkitRequestFullscreen && video.webkitRequestFullscreen());
+         } else {
+            document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen && document.webkitExitFullscreen());
+         }
+      } else if (e.key.toLowerCase() === "p") { // Picture-in-Picture toggle
+         e.preventDefault();
+         if (document.pictureInPictureElement) {
+            document.exitPictureInPicture().catch(err => console.error(err));
+         } else {
+            video.requestPictureInPicture ? video.requestPictureInPicture().catch(err => console.error(err)) : null;
+         }
+      }
+    });
+    
+    /********** SUPPORTO JOYPAD (CONTROLLER/TELECOMANDO) CON DEBOUNCE **********/
+    const debounceDelay = 250;
+    // Impostiamo un oggetto per il debounce degli eventi simulati
+    const debounceTimes = {
+      ArrowUp: 0,
+      ArrowDown: 0,
+      Enter: 0,
+      " ": 0,
+      m: 0,
+      f: 0,
+      p: 0,
+      l: 0, // Per il file input
+      // Volume su e giù li gestiamo con i pulsanti RT e LT
+      volUp: 0,
+      volDown: 0
+    };
+    
+    function simulateKeyEvent(key) {
+      const event = new KeyboardEvent("keydown", { key: key, bubbles: true });
+      document.dispatchEvent(event);
     }
-}
+    
+    function pollGamepad() {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      if (gamepads[0]) {
+        const gp = gamepads[0];
+        let now = Date.now();
+        // D-Pad Up → ArrowUp
+        if (gp.buttons[12] && gp.buttons[12].pressed) {
+          if (now - debounceTimes["ArrowUp"] > debounceDelay) {
+            simulateKeyEvent("ArrowUp");
+            debounceTimes["ArrowUp"] = now;
+          }
+        }
+        // D-Pad Down → ArrowDown
+        if (gp.buttons[13] && gp.buttons[13].pressed) {
+          if (now - debounceTimes["ArrowDown"] > debounceDelay) {
+            simulateKeyEvent("ArrowDown");
+            debounceTimes["ArrowDown"] = now;
+          }
+        }
+        // A Button (indice 0) → Enter
+        if (gp.buttons[0] && gp.buttons[0].pressed) {
+          if (now - debounceTimes["Enter"] > debounceDelay) {
+            simulateKeyEvent("Enter");
+            debounceTimes["Enter"] = now;
+          }
+        }
+        // B Button (indice 1) → Space (pausa/ripresa)
+        if (gp.buttons[1] && gp.buttons[1].pressed) {
+          if (now - debounceTimes[" "] > debounceDelay) {
+            simulateKeyEvent(" ");
+            debounceTimes[" "] = now;
+          }
+        }
+        // LT (indice 6) → "-" (Volume giù)
+        if (gp.buttons[6] && gp.buttons[6].pressed) {
+          if (now - debounceTimes["volDown"] > debounceDelay) {
+            simulateKeyEvent("-");
+            debounceTimes["volDown"] = now;
+          }
+        }
+        // RT (indice 7) → "+" (Volume su)
+        if (gp.buttons[7] && gp.buttons[7].pressed) {
+          if (now - debounceTimes["volUp"] > debounceDelay) {
+            simulateKeyEvent("+");
+            debounceTimes["volUp"] = now;
+          }
+        }
+        // X Button (indice 2) → "m" (Toggle mute)
+        if (gp.buttons[2] && gp.buttons[2].pressed) {
+          if (now - debounceTimes["m"] > debounceDelay) {
+            simulateKeyEvent("m");
+            debounceTimes["m"] = now;
+          }
+        }
+        // Y Button (indice 3) → "f" (Fullscreen toggle)
+        if (gp.buttons[3] && gp.buttons[3].pressed) {
+          if (now - debounceTimes["f"] > debounceDelay) {
+            simulateKeyEvent("f");
+            debounceTimes["f"] = now;
+          }
+        }
+        // LB (indice 4) → "l" (Per riaprire il file input)
+        if (gp.buttons[4] && gp.buttons[4].pressed) {
+          if (now - debounceTimes["l"] > debounceDelay) {
+            simulateKeyEvent("l");
+            debounceTimes["l"] = now;
+          }
+        }
+        // Back Button (indice 8) → "p" (Picture-in-Picture)
+        if (gp.buttons[8] && gp.buttons[8].pressed) {
+          if (now - debounceTimes["p"] > debounceDelay) {
+            simulateKeyEvent("p");
+            debounceTimes["p"] = now;
+          }
+        }
+      }
+      requestAnimationFrame(pollGamepad);
+    }
+    
+    window.addEventListener("gamepadconnected", function(e) {
+      console.log("Gamepad collegato:", e.gamepad);
+    });
+    if (navigator.getGamepads) {
+      requestAnimationFrame(pollGamepad);
+    }
+    
+    video.addEventListener("playing", () => showSpinner(false));
+    video.addEventListener("waiting", () => showSpinner(true));
