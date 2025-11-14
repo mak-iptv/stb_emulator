@@ -746,6 +746,39 @@ addTestChannels() {
             isOnline: true
         }
     ];
+
+    // Zëvendëso funksionin getStreamWithProxy me këtë version të përmirësuar
+async getStreamWithProxy(url) {
+    // Kontrollo nëse URL-ja është e vlefshme
+    if (!url || url.trim() === '') {
+        throw new Error('URL e zbrazët');
+    }
+
+    // Provim direkt fillimisht
+    try {
+        console.log('Duke provuar direkt:', url);
+        const test = await fetch(url, { 
+            method: 'HEAD',
+            mode: 'no-cors',
+            cache: 'no-cache'
+        });
+        return url; // Nëse fetch nuk hedh error, provo direkt
+    } catch (error) {
+        console.log('CORS error, duke përdorur proxy...');
+    }
+
+    // Proxy të ndryshëm për testim
+    const proxyUrls = [
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+        `https://cors-anywhere.herokuapp.com/${url}`,
+        `https://proxy.cors.sh/${url}`,
+        `https://thingproxy.freeboard.io/fetch/${url}`
+    ];
+
+    // Kthe proxy-n më të besueshme
+    return proxyUrls[0];
+}
     
     this.channels = [...testChannels, ...this.channels];
     this.displayChannels();
