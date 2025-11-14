@@ -8,16 +8,21 @@ class M3UPlayer {
         this.isPlaying = false;
         this.filteredPlaylist = [];
 
+        // CORS Proxy për të shmangur problemet CORS
+        this.corsProxies = [
+            'https://corsproxy.io/?',
+            'https://api.allorigins.win/raw?url=',
+            'https://cors-anywhere.herokuapp.com/'
+        ];
+
         this.initializeEventListeners();
     }
 
     initializeEventListeners() {
-        // Ngarko skedarin M3U
         document.getElementById('m3uFile').addEventListener('change', (e) => {
             this.loadM3UFile(e.target.files[0]);
         });
 
-        // Kontrollat e playerit
         document.getElementById('playBtn').addEventListener('click', () => {
             this.play();
         });
@@ -47,12 +52,10 @@ class M3UPlayer {
             this.videoPlayer.currentTime = seekTime;
         });
 
-        // Kërkimi në playlist
         this.searchInput.addEventListener('input', (e) => {
             this.filterPlaylist(e.target.value);
         });
 
-        // Ndërhyrje video
         this.videoPlayer.addEventListener('timeupdate', () => {
             this.updateProgress();
         });
@@ -65,13 +68,16 @@ class M3UPlayer {
             this.nextTrack();
         });
 
-        // Keyboard shortcuts
+        this.videoPlayer.addEventListener('error', (e) => {
+            this.handleVideoError(e);
+        });
+
         document.addEventListener('keydown', (e) => {
             this.handleKeyboard(e);
         });
     }
 
-    loadM3UFile(file) {
+    async loadM3UFile(file) {
         const reader = new FileReader();
         
         reader.onload = (e) => {
@@ -96,34 +102,45 @@ class M3UPlayer {
         this.playlist = [];
         const lines = content.split('\n');
         let currentGroup = 'General';
+        let currentLogo = '';
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             
             if (line.startsWith('#EXTINF:')) {
+                const trackInfo = this.parseExtinf(line);
+                currentGroup = trackInfo.group || currentGroup;
+                currentLogo = trackInfo.logo || currentLogo;
+                
                 const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
                 if (nextLine && !nextLine.startsWith('#')) {
-                    const trackInfo = this.parseExtinf(line);
                     this.playlist.push({
                         title: trackInfo.title,
                         url: nextLine,
                         duration: trackInfo.duration,
-                        group: trackInfo.group || currentGroup,
-                        logo: trackInfo.logo
+                        group: currentGroup,
+                        logo: currentLogo,
+                        rawUrl: nextLine // Ruaj URL-në origjinale
                     });
                     i++;
                 }
             } else if (line.startsWith('#EXTGRP:')) {
                 currentGroup = line.replace('#EXTGRP:', '').trim();
+            } else if (line.startsWith('#EXTIMG:')) {
+                currentLogo = line.replace('#EXTIMG:', '').trim();
             } else if (line && !line.startsWith('#') && line !== '') {
                 this.playlist.push({
                     title: `Kanali ${this.playlist.length + 1}`,
                     url: line,
                     duration: 0,
-                    group: currentGroup
+                    group: currentGroup,
+                    logo: currentLogo,
+                    rawUrl: line
                 });
             }
         }
+        
+        console.log(`U gjetën ${this.playlist.length} kanale`);
     }
 
     parseExtinf(extinfLine) {
@@ -131,34 +148,216 @@ class M3UPlayer {
             duration: 0,
             title: 'Unknown Channel',
             group: 'General',
-            logo: null
+            logo: ''
         };
 
-        // Marr titullin
+        // Titulli
         const titleMatch = extinfLine.match(/,(.*)$/);
         if (titleMatch) {
             info.title = titleMatch[1].trim();
         }
 
-        // Marr duration
-        const durationMatch = extinfLine.match(/:-?\d+/);
+        // Duration
+        const durationMatch = extinfLine.match(/:(-?\d+)/);
         if (durationMatch) {
-            info.duration = parseInt(durationMatch[0].substr(1));
+            info.duration = parseInt(durationMatch[1]);
         }
 
-        // Marr group
-        const groupMatch = extinfLine.match(/group-title="([^"]*)"/);
+        // Group
+        const groupMatch = extinfLine.match(/group-title="([^"]*)"/i);
         if (groupMatch) {
             info.group = groupMatch[1];
         }
 
-        // Marr logo
-        const logoMatch = extinfLine.match(/tvg-logo="([^"]*)"/);
+        // Logo
+        const logoMatch = extinfLine.match(/tvg-logo="([^"]*)"/i);
         if (logoMatch) {
             info.logo = logoMatch[1];
         }
 
         return info;
+    }
+
+    async loadTrack(index) {
+        if (index >= 0 && index < this.playlist.length) {
+            this.currentTrackIndex = index;
+            const track = this.playlist[index];
+            
+            this.showLoadingMessage(`Duke ngarkuar: ${track.title}`);
+            this.updatePlayerTitle(track.title);
+            
+            try {
+                // Provim me URL të ndryshme
+                const videoUrl = await this.prepareVideoUrl(track.rawUrl);
+                this.videoPlayer.src = videoUrl;
+                
+                // Shtojmë header-a të nevojshme për stream
+                this.videoPlayer.setAttribute('crossorigin', 'anonymous');
+                
+                await this.play();
+                this.hideLoadingMessage();
+                
+            } catch (error) {
+                console.error('Error loading track:', error);
+                this.hideLoadingMessage();
+                this.showErrorMessage(`Gabim: ${track.title} - Provoni kanalin tjetër`);
+            }
+            
+            this.updateActiveTrack();
+        }
+    }
+
+    async prepareVideoUrl(originalUrl) {
+        // Kontrollojmë nëse URL është e vlefshme
+        if (!originalUrl || originalUrl.trim() === '') {
+            throw new Error('URL e zbrazët');
+        }
+
+        // Nëse është URL lokale ose direkt video file
+        if (originalUrl.startsWith('http') && 
+            (originalUrl.match(/\.(m3u8|mp4|avi|mkv|webm)$/) || 
+             originalUrl.includes('m3u8') ||
+             originalUrl.includes('stream'))) {
+            
+            // Provim direkt
+            try {
+                const testResponse = await fetch(originalUrl, { 
+                    method: 'HEAD',
+                    mode: 'no-cors'
+                });
+                return originalUrl;
+            } catch (error) {
+                console.log('Duke përdorur proxy për:', originalUrl);
+                // Përdorim proxy nëse direkt nuk funksionon
+                return this.corsProxies[0] + encodeURIComponent(originalUrl);
+            }
+        }
+
+        return originalUrl;
+    }
+
+    async play() {
+        try {
+            await this.videoPlayer.play();
+            this.isPlaying = true;
+            return true;
+        } catch (error) {
+            console.error('Play error:', error);
+            
+            // Provim me approach të ndryshëm për HLS
+            if (this.videoPlayer.src.includes('.m3u8')) {
+                this.showErrorMessage('Formati M3U8 kërkon mbështetje të veçantë. Përdorni HLS.js për shfletues.');
+            }
+            
+            throw error;
+        }
+    }
+
+    pause() {
+        this.videoPlayer.pause();
+        this.isPlaying = false;
+    }
+
+    nextTrack() {
+        let nextIndex = (this.currentTrackIndex + 1) % this.playlist.length;
+        let attempts = 0;
+        
+        // Provim deri në 5 kanale të radhës
+        while (attempts < 5) {
+            this.loadTrack(nextIndex);
+            nextIndex = (nextIndex + 1) % this.playlist.length;
+            attempts++;
+            break; // Hiqni këtë nëse doni të provoni automatikisht kanale të ndryshme
+        }
+    }
+
+    previousTrack() {
+        const prevIndex = this.currentTrackIndex - 1;
+        this.loadTrack(prevIndex >= 0 ? prevIndex : this.playlist.length - 1);
+    }
+
+    toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            const player = this.videoPlayer.parentElement;
+            player.requestFullscreen?.() || 
+            player.webkitRequestFullscreen?.() || 
+            player.mozRequestFullScreen?.();
+        } else {
+            document.exitFullscreen?.() || 
+            document.webkitExitFullscreen?.() || 
+            document.mozCancelFullScreen?.();
+        }
+    }
+
+    handleVideoError(e) {
+        console.error('Video error:', e);
+        const error = this.videoPlayer.error;
+        
+        let message = 'Gabim në video: ';
+        switch(error?.code) {
+            case 1:
+                message += 'Video e abortuar';
+                break;
+            case 2:
+                message += 'Problem rrjeti';
+                break;
+            case 3:
+                message += 'Gabim dekodimi';
+                break;
+            case 4:
+                message += 'Video nuk mbështetet';
+                break;
+            default:
+                message += 'Gabim i panjohur';
+        }
+        
+        this.showErrorMessage(message);
+    }
+
+    showLoadingMessage(message) {
+        this.hideLoadingMessage();
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loadingMessage';
+        loadingDiv.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+        `;
+        loadingDiv.textContent = message;
+        this.videoPlayer.parentElement.style.position = 'relative';
+        this.videoPlayer.parentElement.appendChild(loadingDiv);
+    }
+
+    hideLoadingMessage() {
+        const existing = document.getElementById('loadingMessage');
+        if (existing) existing.remove();
+    }
+
+    showErrorMessage(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            z-index: 10000;
+            max-width: 300px;
+        `;
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+        
+        setTimeout(() => {
+            errorDiv.remove();
+        }, 5000);
     }
 
     filterPlaylist(searchTerm) {
@@ -194,11 +393,14 @@ class M3UPlayer {
             
             li.innerHTML = `
                 <div class="channel-logo">
-                    ${channel.logo ? `<img src="${channel.logo}" alt="${channel.title}" style="width:100%;height:100%;border-radius:50%;">` : '📺'}
+                    ${channel.logo ? 
+                        `<img src="${channel.logo}" alt="${channel.title}" onerror="this.style.display='none'" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : 
+                        '📺'}
                 </div>
                 <div class="channel-info">
                     <div class="channel-name">${channel.title}</div>
                     <div class="channel-group">${channel.group}</div>
+                    <div class="channel-url">${this.truncateUrl(channel.rawUrl)}</div>
                 </div>
             `;
             
@@ -210,53 +412,11 @@ class M3UPlayer {
         });
     }
 
-    loadTrack(index) {
-        if (index >= 0 && index < this.playlist.length) {
-            this.currentTrackIndex = index;
-            const track = this.playlist[index];
-            
-            this.videoPlayer.src = track.url;
-            this.updateActiveTrack();
-            this.updatePlayerTitle(track.title);
-            
-            this.play().catch(e => {
-                console.log('Auto-play prevented:', e);
-            });
+    truncateUrl(url) {
+        if (url.length > 40) {
+            return url.substring(0, 37) + '...';
         }
-    }
-
-    play() {
-        return this.videoPlayer.play().then(() => {
-            this.isPlaying = true;
-        }).catch(e => {
-            console.error('Error playing video:', e);
-            alert('Gabim gjatë luajtjes së videos. Kontrolloni URL-në.');
-        });
-    }
-
-    pause() {
-        this.videoPlayer.pause();
-        this.isPlaying = false;
-    }
-
-    nextTrack() {
-        const nextIndex = (this.currentTrackIndex + 1) % this.playlist.length;
-        this.loadTrack(nextIndex);
-    }
-
-    previousTrack() {
-        const prevIndex = this.currentTrackIndex - 1;
-        this.loadTrack(prevIndex >= 0 ? prevIndex : this.playlist.length - 1);
-    }
-
-    toggleFullscreen() {
-        if (!document.fullscreenElement) {
-            this.videoPlayer.requestFullscreen().catch(err => {
-                console.log(`Error attempting to enable fullscreen: ${err.message}`);
-            });
-        } else {
-            document.exitFullscreen();
-        }
+        return url;
     }
 
     updateActiveTrack() {
