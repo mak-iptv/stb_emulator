@@ -6,191 +6,100 @@
 
 body {
     font-family: Arial, sans-serif;
-    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    background: #1a1a1a;
     color: white;
-    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 20px;
 }
 
-.stb-container {
-    max-width: 1200px;
-    margin: 0 auto;
+header {
+    background: #2d2d2d;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
 
-.player-header {
+.controls {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 10px;
+    gap: 10px;
+    margin-top: 10px;
     flex-wrap: wrap;
 }
 
-.mac-display {
-    font-family: monospace;
-    background: #000;
-    padding: 8px 12px;
-    border-radius: 5px;
-    font-size: 14px;
-}
-
-.status {
-    padding: 8px 12px;
-    border-radius: 5px;
-    font-weight: bold;
-}
-
-.status.connected {
-    background: #28a745;
-    color: white;
-}
-
-.status.disconnected {
-    background: #dc3545;
-    color: white;
-}
-
-.portal-config {
-    background: rgba(0, 0, 0, 0.5);
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-}
-
-.config-form {
-    display: grid;
-    gap: 15px;
-    margin-top: 15px;
-}
-
-.input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.input-group label {
-    font-weight: bold;
-    color: #4dabf7;
-}
-
-.input-group input {
+input[type="text"], input[type="file"] {
     padding: 10px;
-    border: 1px solid #ccc;
+    border: none;
     border-radius: 5px;
-    background: rgba(255, 255, 255, 0.9);
+    flex: 1;
+    min-width: 200px;
 }
 
 button {
-    padding: 12px 24px;
+    padding: 10px 20px;
     background: #007bff;
     color: white;
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    font-size: 16px;
-    transition: background 0.3s;
 }
 
 button:hover {
     background: #0056b3;
 }
 
-button:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
+.main-content {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
 }
 
-.video-container {
-    background: #000;
+.channel-list {
+    background: #2d2d2d;
     border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 20px;
-    position: relative;
-    min-height: 400px;
+    padding: 15px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.channel-item {
+    padding: 10px;
+    margin: 5px 0;
+    background: #3d3d3d;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.channel-item:hover {
+    background: #4d4d4d;
+}
+
+.video-player {
+    background: #2d2d2d;
+    border-radius: 10px;
+    padding: 15px;
 }
 
 #videoPlayer {
     width: 100%;
-    height: auto;
-    max-height: 600px;
+    max-height: 500px;
+    background: black;
+    border-radius: 5px;
 }
 
-.loading {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.8);
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-}
-
-.controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    justify-content: center;
-    flex-wrap: wrap;
-}
-
-.categories, .channels, .connection-info, .logs {
-    background: rgba(0, 0, 0, 0.5);
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-}
-
-.categories-list, .channels-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 10px;
+.player-info {
     margin-top: 15px;
 }
 
-.category, .channel {
-    padding: 15px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 5px;
-    cursor: pointer;
-    text-align: center;
-    transition: background 0.3s;
-}
-
-.category:hover, .channel:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.category.active, .channel.active {
-    background: #007bff;
-    border: 2px solid #4dabf7;
-}
-
-#logContainer {
-    background: #000;
-    padding: 15px;
-    border-radius: 5px;
-    max-height: 200px;
-    overflow-y: auto;
-    font-family: monospace;
-    font-size: 12px;
-}
-
-.log-entry {
-    margin-bottom: 5px;
-    padding: 2px 5px;
-    border-left: 3px solid #007bff;
-}
-
-.log-error {
-    border-left-color: #dc3545;
-    color: #dc3545;
-}
-
-.log-success {
-    border-left-color: #28a745;
-    color: #28a745;
+@media (max-width: 768px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .controls {
+        flex-direction: column;
+    }
 }
