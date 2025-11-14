@@ -1,36 +1,44 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sq">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Web Player</title>
+    <title>Web Player M3U</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>IPTV Web Player</h1>
+    <div class="player-container">
+        <h1>Web Player M3U</h1>
+        
+        <div class="upload-section">
+            <input type="file" id="m3uFile" accept=".m3u,.m3u8">
+            <label for="m3uFile" class="upload-btn">Ngarko skedarin M3U</label>
+        </div>
+
+        <div class="player">
+            <audio id="audioPlayer" controls>
+                <source src="" type="audio/mpeg">
+                Shfletuesi juaj nuk mbështet elementin audio.
+            </audio>
+            
             <div class="controls">
-                <input type="text" id="m3uUrl" placeholder="Enter M3U URL or file">
-                <input type="file" id="m3uFile" accept=".m3u,.m3u8">
-                <button id="loadPlaylist">Load Playlist</button>
-            </div>
-        </header>
-
-        <div class="main-content">
-            <div class="channel-list">
-                <h3>Channels</h3>
-                <div id="channelList"></div>
+                <button id="prevBtn">⏮️</button>
+                <button id="playBtn">▶️</button>
+                <button id="pauseBtn">⏸️</button>
+                <button id="nextBtn">⏭️</button>
+                <span id="currentTime">00:00</span>
+                <span id="duration">00:00</span>
             </div>
 
-            <div class="video-player">
-                <video id="videoPlayer" controls>
-                    Your browser does not support the video tag.
-                </video>
-                <div class="player-info">
-                    <h3 id="currentChannel">No channel selected</h3>
-                </div>
+            <div class="volume-control">
+                <span>🔊</span>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1">
             </div>
+        </div>
+
+        <div class="playlist">
+            <h3>Playlist</h3>
+            <ul id="playlistItems"></ul>
         </div>
     </div>
 
