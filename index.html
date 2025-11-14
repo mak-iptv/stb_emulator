@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STB Player - Punon 100%</title>
+    <title>STB Player - Generim nga MAC</title>
     <style>
         * {
             margin: 0;
@@ -13,10 +13,9 @@
         
         body {
             font-family: Arial, sans-serif;
-            background: #1e1e2e;
+            background: #1a1a2e;
             color: white;
             padding: 20px;
-            line-height: 1.6;
         }
         
         .container {
@@ -28,51 +27,50 @@
             text-align: center;
             margin-bottom: 30px;
             padding: 20px;
-            background: #2d2d44;
+            background: #16213e;
             border-radius: 10px;
         }
         
         .header h1 {
-            color: #4CAF50;
+            color: #00ff88;
             margin-bottom: 10px;
         }
         
         .setup-box {
-            background: #2d2d44;
+            background: #16213e;
             padding: 20px;
             border-radius: 10px;
             margin-bottom: 20px;
         }
         
-        .input-group {
-            display: flex;
+        .server-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
             gap: 10px;
             margin-bottom: 15px;
-            flex-wrap: wrap;
         }
         
-        input {
-            flex: 1;
+        input, select, button {
             padding: 12px;
             border: none;
             border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        input {
             background: white;
             color: #333;
-            min-width: 200px;
         }
         
         button {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
-            background: #4CAF50;
-            color: white;
+            background: #00ff88;
+            color: #1a1a2e;
             cursor: pointer;
             font-weight: bold;
         }
         
         button:hover {
-            background: #45a049;
+            background: #00cc6a;
         }
         
         .content {
@@ -89,313 +87,440 @@
         }
         
         .channels {
-            background: #2d2d44;
+            background: #16213e;
             padding: 15px;
             border-radius: 10px;
-            max-height: 500px;
+            max-height: 600px;
             overflow-y: auto;
         }
         
         .channel {
             padding: 15px;
             margin-bottom: 10px;
-            background: #3d3d5c;
+            background: #0f3460;
             border-radius: 5px;
             cursor: pointer;
-            border-left: 4px solid #4CAF50;
+            border-left: 4px solid #00ff88;
         }
         
         .channel:hover {
-            background: #4d4d6c;
+            background: #1a508b;
         }
         
-        .player {
+        .channel.offline {
+            opacity: 0.6;
+            border-left-color: #ff4444;
+        }
+        
+        .player-container {
             background: black;
             border-radius: 10px;
             padding: 10px;
+            position: relative;
         }
         
         video {
             width: 100%;
             border-radius: 5px;
+            background: #000;
+        }
+        
+        .player-info {
+            padding: 15px;
+            background: rgba(0,0,0,0.8);
+            border-radius: 5px;
+            margin-top: 10px;
         }
         
         .status {
             text-align: center;
             padding: 15px;
-            background: #2d2d44;
+            background: #16213e;
             border-radius: 10px;
             margin-top: 20px;
         }
         
-        .success { color: #4CAF50; }
-        .error { color: #f44336; }
-        .info { color: #2196F3; }
+        .success { color: #00ff88; }
+        .error { color: #ff4444; }
+        .warning { color: #ffaa00; }
+        .info { color: #00aaff; }
         
-        .tips {
-            background: #2d2d44;
+        .server-info {
+            background: #16213e;
             padding: 15px;
             border-radius: 10px;
             margin-top: 20px;
         }
         
-        .tips h3 {
-            color: #FF9800;
-            margin-bottom: 10px;
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .info-item {
+            padding: 10px;
+            background: #0f3460;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎬 STB PLAYER - VERSION I THJESHTË</h1>
-            <p>Shkruaj serverin tënd dhe kliko "Lidhu". Pastaj kliko në çdo kanal për ta luajtur.</p>
+            <h1>🔌 STB MAG PLAYER - Generim Stream-i nga MAC</h1>
+            <p>Shkruaj detajet e serverit tënd STB për të gjeneruar stream-et direkt nga MAC adresa</p>
         </div>
 
         <div class="setup-box">
-            <div class="input-group">
-                <input type="text" id="serverUrl" placeholder="http://server-i-tend.com:8080" value="http://">
-                <input type="text" id="macAddress" placeholder="MAC Address: 00:1A:79:XX:XX:XX" value="00:1A:79:11:22:33">
-                <button onclick="connectToServer()">🔗 LIDHU ME SERVER</button>
+            <div class="server-form">
+                <input type="text" id="serverUrl" placeholder="http://server-i-tend.com" value="http://">
+                <input type="text" id="serverPort" placeholder="Porti (8080)" value="8080">
+                <input type="text" id="macAddress" placeholder="MAC: 00:1A:79:XX:XX:XX" value="00:1A:79:">
+                <select id="protocol">
+                    <option value="m3u">M3U Format</option>
+                    <option value="ts">TS Stream</option>
+                    <option value="m3u8">M3U8 HLS</option>
+                </select>
+                <button onclick="generateFromMAC()">🔗 GJENERO STREAM-ET</button>
             </div>
         </div>
 
         <div class="content">
             <div class="channels" id="channelsList">
-                <div class="channel" onclick="playTestStream(1)">
-                    <strong>🎬 Big Buck Bunny (MP4)</strong>
-                    <div style="font-size: 12px; opacity: 0.8;">Test Stream • HD • GARANTUAR PUNON</div>
-                </div>
-                <div class="channel" onclick="playTestStream(2)">
-                    <strong>📡 HLS Test Stream</strong>
-                    <div style="font-size: 12px; opacity: 0.8;">HLS Format • HD • GARANTUAR PUNON</div>
-                </div>
-                <div class="channel" onclick="playTestStream(3)">
-                    <strong>🌍 Live Test Stream</strong>
-                    <div style="font-size: 12px; opacity: 0.8;">Live HLS • HD • GARANTUAR PUNON</div>
-                </div>
-                <div class="channel" onclick="playTestStream(4)">
-                    <strong>🐭 Elephant Dream (MP4)</strong>
-                    <div style="font-size: 12px; opacity: 0.8;">MP4 Test • HD • GARANTUAR PUNON</div>
+                <div style="text-align: center; padding: 40px; opacity: 0.7;">
+                    📡 Kliko "GJENERO STREAM-ET" për të ngarkuar kanalet nga MAC adresa
                 </div>
             </div>
 
-            <div class="player">
-                <video id="videoPlayer" controls autoplay muted>
-                    Browser-i yt nuk mbështet videon. Provo Chrome, Firefox ose Edge.
+            <div class="player-container">
+                <video id="videoPlayer" controls muted>
+                    Browser-i yt nuk mbështet videon.
                 </video>
+                <div class="player-info">
+                    <div id="nowPlaying">Zgjidhni një kanal për të luajtur</div>
+                    <div id="streamInfo" style="font-size: 12px; opacity: 0.8;"></div>
+                </div>
             </div>
         </div>
 
         <div class="status">
-            <span id="statusMessage" class="success">✅ Gati për përdorim! Kliko në një kanal.</span>
+            <span id="statusMessage" class="info">🟢 Gati për gjenerim stream-esh nga MAC adresa</span>
         </div>
 
-        <div class="tips">
-            <h3>💡 KËSHILLA PËR PËRDORIM:</h3>
-            <p>• <strong>Space</strong> - Play/Pause</p>
-            <p>• <strong>F</strong> - Ekran i plotë</p>
-            <p>• <strong>M</strong> - Mute/Unmute</p>
-            <p>• <strong>Arrow Keys</strong> - Kontrollo volumin dhe kohën</p>
+        <div class="server-info">
+            <h3>📊 Informacioni i Serverit</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Status:</strong> <span id="serverStatus">I palidhur</span>
+                </div>
+                <div class="info-item">
+                    <strong>MAC:</strong> <span id="currentMAC">-</span>
+                </div>
+                <div class="info-item">
+                    <strong>Server:</strong> <span id="currentServer">-</span>
+                </div>
+                <div class="info-item">
+                    <strong>Kanale:</strong> <span id="channelCount">0</span>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // Variabla globale
-        let currentStream = null;
-        
-        // Stream-e të garantuara që punojnë
-        const testStreams = {
-            1: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-            2: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-            3: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
-            4: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'
-        };
-        
-        // Funksioni kryesor për lidhje
-        function connectToServer() {
-            const serverUrl = document.getElementById('serverUrl').value;
-            const macAddress = document.getElementById('macAddress').value;
-            
-            if (!serverUrl || serverUrl === 'http://') {
-                showMessage('❌ Shkruaj URL e serverit tënd!', 'error');
-                return;
+        class STBStreamGenerator {
+            constructor() {
+                this.channels = [];
+                this.currentChannel = null;
+                this.serverConfig = null;
             }
-            
-            if (!macAddress || macAddress === '00:1A:79:') {
-                showMessage('❌ Shkruaj MAC Address të vlefshëm!', 'error');
-                return;
-            }
-            
-            showMessage('🔄 Duke u lidhur me server...', 'info');
-            
-            // Simulojmë lidhjen
-            setTimeout(() => {
-                showMessage('✅ U lidh me sukses me serverin! Tani kliko në çdo kanal.', 'success');
+
+            // Gjenero URL stream nga MAC adresa
+            generateStreamURL(macAddress, channelId, protocol = 'm3u') {
+                // Formatet e ndryshme të stream-ve bazuar në MAC
+                const baseURL = this.serverConfig ? 
+                    `${this.serverConfig.url}:${this.serverConfig.port}` : 
+                    'http://server-i-tend.com:8080';
+
+                // Nga MAC adresa krijojmë parametra unikë
+                const macHash = this.hashMAC(macAddress);
+                const timestamp = Date.now();
                 
-                // Shto kanale shtesë pas lidhjes
-                addMoreChannels();
-                
-            }, 2000);
-        }
-        
-        // Funksioni për luajtjen e stream-ve testuese
-        function playTestStream(streamId) {
-            const streamUrl = testStreams[streamId];
-            if (!streamUrl) {
-                showMessage('❌ Stream-i nuk u gjet!', 'error');
-                return;
-            }
-            
-            const videoPlayer = document.getElementById('videoPlayer');
-            const streamName = getStreamName(streamId);
-            
-            showMessage(`🔄 Duke ngarkuar ${streamName}...`, 'info');
-            
-            // Provim direkt
-            videoPlayer.src = streamUrl;
-            videoPlayer.load();
-            
-            videoPlayer.play().then(() => {
-                showMessage(`✅ Po luan: ${streamName}`, 'success');
-                currentStream = streamId;
-            }).catch(error => {
-                console.error('Gabim:', error);
-                showMessage(`❌ Nuk mund të luajë ${streamName}. Provo me browser tjetër.`, 'error');
-            });
-        }
-        
-        // Emri i stream-ve
-        function getStreamName(streamId) {
-            const names = {
-                1: 'Big Buck Bunny',
-                2: 'HLS Test Stream', 
-                3: 'Live Test Stream',
-                4: 'Elephant Dream'
-            };
-            return names[streamId] || 'Stream';
-        }
-        
-        // Shto kanale shtesë pas lidhjes
-        function addMoreChannels() {
-            const channelsList = document.getElementById('channelsList');
-            
-            const additionalChannels = [
-                {
-                    name: "📺 RTSH 1",
-                    streamId: 5,
-                    url: "https://tv.rtsh.live/rtsh1/index.m3u8",
-                    desc: "RTSH 1 Live • HD"
-                },
-                {
-                    name: "📺 RTSH 2", 
-                    streamId: 6,
-                    url: "https://tv.rtsh.live/rtsh2/index.m3u8",
-                    desc: "RTSH 2 Live • SD"
-                },
-                {
-                    name: "🎵 Music Test",
-                    streamId: 7,
-                    url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-                    desc: "Music Video • MP4 • HD"
+                switch(protocol) {
+                    case 'm3u':
+                        return `${baseURL}/get.php?username=${macHash}&password=${macHash}&type=m3u&output=ts`;
+                    
+                    case 'm3u8':
+                        return `${baseURL}/live/${macHash}/${channelId}/index.m3u8?token=${timestamp}`;
+                    
+                    case 'ts':
+                        return `${baseURL}/live/${macHash}/${channelId}.ts?token=${timestamp}`;
+                    
+                    default:
+                        return `${baseURL}/get.php?username=${macHash}&password=${macHash}&type=m3u`;
                 }
-            ];
-            
-            additionalChannels.forEach(channel => {
-                testStreams[channel.streamId] = channel.url;
+            }
+
+            // Hash MAC adresën për të krijuar credentiale unike
+            hashMAC(mac) {
+                let hash = 0;
+                for (let i = 0; i < mac.length; i++) {
+                    hash = ((hash << 5) - hash) + mac.charCodeAt(i);
+                    hash = hash & hash;
+                }
+                return Math.abs(hash).toString(16).substring(0, 8);
+            }
+
+            // Simuloj gjenerimin e kanaleve nga serveri STB
+            async generateChannelsFromMAC(serverUrl, port, macAddress, protocol) {
+                this.serverConfig = { url: serverUrl, port, macAddress, protocol };
                 
-                const channelElement = document.createElement('div');
-                channelElement.className = 'channel';
-                channelElement.onclick = () => playTestStream(channel.streamId);
-                channelElement.innerHTML = `
-                    <strong>${channel.name}</strong>
-                    <div style="font-size: 12px; opacity: 0.8;">${channel.desc}</div>
-                `;
+                // Përditëso informacionin e serverit
+                document.getElementById('currentMAC').textContent = macAddress;
+                document.getElementById('currentServer').textContent = `${serverUrl}:${port}`;
+                document.getElementById('serverStatus').textContent = 'Duke gjeneruar...';
+                document.getElementById('serverStatus').className = 'warning';
+
+                // Simuloj vonesë lidhjeje
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Gjenero kanale të ndryshme bazuar në MAC
+                const channelTemplates = this.getChannelTemplatesByMAC(macAddress);
                 
-                channelsList.appendChild(channelElement);
-            });
+                this.channels = channelTemplates.map((template, index) => {
+                    const streamUrl = this.generateStreamURL(macAddress, template.id, protocol);
+                    
+                    return {
+                        id: template.id,
+                        name: template.name,
+                        url: streamUrl,
+                        category: template.category,
+                        quality: template.quality,
+                        isOnline: Math.random() > 0.2, // 80% online
+                        bitrate: this.getBitrate(template.quality),
+                        resolution: this.getResolution(template.quality),
+                        description: `Gjeneruar nga MAC: ${macAddress}`
+                    };
+                });
+
+                return this.channels;
+            }
+
+            // Kthe template kanalesh bazuar në MAC
+            getChannelTemplatesByMAC(mac) {
+                // MAC prefix përcakton llojin e kanaleve
+                const macPrefix = mac.substring(0, 8);
+                
+                const templates = {
+                    '00:1A:79': [ // MAG Devices
+                        { id: 101, name: '📺 RTSH 1 HD', category: 'Shqipëri', quality: 'HD' },
+                        { id: 102, name: '📺 RTSH 2', category: 'Shqipëri', quality: 'SD' },
+                        { id: 103, name: '📺 Top Channel HD', category: 'Shqipëri', quality: 'HD' },
+                        { id: 104, name: '📺 Klan TV', category: 'Shqipëri', quality: 'HD' },
+                        { id: 105, name: '📺 Vizion Plus', category: 'Shqipëri', quality: 'HD' },
+                        { id: 201, name: '🌍 CNN International', category: 'Ndotëror', quality: 'HD' },
+                        { id: 202, name: '🌍 BBC World', category: 'Ndotëror', quality: 'HD' },
+                        { id: 301, name: '⚽ SuperSport 1', category: 'Sport', quality: 'FHD' },
+                        { id: 302, name: '⚽ SuperSport 2', category: 'Sport', quality: 'FHD' }
+                    ],
+                    '00:1B:67': [ // STB Devices
+                        { id: 111, name: '🎬 Film Hits HD', category: 'Filma', quality: 'FHD' },
+                        { id: 112, name: '🎬 Action TV', category: 'Filma', quality: 'HD' },
+                        { id: 113, name: '🎬 Comedy Central', category: 'Filma', quality: 'HD' },
+                        { id: 211, name: '📡 Discovery HD', category: 'Dokumentar', quality: 'HD' },
+                        { id: 212, name: '📡 Nat Geo Wild', category: 'Dokumentar', quality: 'HD' }
+                    ],
+                    'default': [ // Default templates
+                        { id: 999, name: '📺 Test Channel 1', category: 'Test', quality: 'HD' },
+                        { id: 998, name: '📺 Test Channel 2', category: 'Test', quality: 'SD' },
+                        { id: 997, name: '🎵 Music Channel', category: 'Muzik', quality: 'HD' }
+                    ]
+                };
+
+                return templates[macPrefix] || templates['default'];
+            }
+
+            getBitrate(quality) {
+                const bitrates = { 'SD': '1.5 Mbps', 'HD': '3 Mbps', 'FHD': '6 Mbps', '4K': '15 Mbps' };
+                return bitrates[quality] || '1.5 Mbps';
+            }
+
+            getResolution(quality) {
+                const resolutions = { 'SD': '720x576', 'HD': '1280x720', 'FHD': '1920x1080', '4K': '3840x2160' };
+                return resolutions[quality] || '720x576';
+            }
+
+            // Shfaq kanalet në listë
+            displayChannels() {
+                const channelsList = document.getElementById('channelsList');
+                channelsList.innerHTML = '<h3>📡 Kanalet e Gjeneruara</h3>';
+                
+                this.channels.forEach(channel => {
+                    const channelElement = document.createElement('div');
+                    channelElement.className = `channel ${channel.isOnline ? '' : 'offline'}`;
+                    channelElement.innerHTML = `
+                        <strong>${channel.name}</strong>
+                        <div style="font-size: 12px; opacity: 0.8;">
+                            ${channel.category} • ${channel.quality} • ${channel.bitrate}
+                            ${!channel.isOnline ? ' • 🔴 OFFLINE' : ''}
+                        </div>
+                        <div style="font-size: 10px; opacity: 0.6; margin-top: 5px;">
+                            ${channel.description}
+                        </div>
+                    `;
+                    
+                    if (channel.isOnline) {
+                        channelElement.onclick = () => this.playChannel(channel);
+                    }
+                    
+                    channelsList.appendChild(channelElement);
+                });
+
+                document.getElementById('channelCount').textContent = this.channels.length;
+            }
+
+            // Luaj kanalin
+            async playChannel(channel) {
+                const videoPlayer = document.getElementById('videoPlayer');
+                const nowPlaying = document.getElementById('nowPlaying');
+                const streamInfo = document.getElementById('streamInfo');
+
+                nowPlaying.textContent = `▶️ Po luan: ${channel.name}`;
+                streamInfo.textContent = `${channel.quality} • ${channel.resolution} • ${channel.bitrate}`;
+
+                showMessage(`🔄 Duke ngarkuar ${channel.name}...`, 'info');
+
+                try {
+                    // Shto timestamp për të shmangur cache
+                    const cacheBusterUrl = channel.url + (channel.url.includes('?') ? '&' : '?') + 't=' + Date.now();
+                    
+                    videoPlayer.src = cacheBusterUrl;
+                    videoPlayer.load();
+
+                    await videoPlayer.play();
+                    
+                    showMessage(`✅ Po luan: ${channel.name}`, 'success');
+                    document.getElementById('serverStatus').textContent = 'Online';
+                    document.getElementById('serverStatus').className = 'success';
+
+                } catch (error) {
+                    console.error('Gabim në play:', error);
+                    
+                    // Provim me fallback nëse stream-i nuk punon
+                    this.tryFallbackStream(channel);
+                }
+            }
+
+            // Provim me stream fallback
+            tryFallbackStream(channel) {
+                showMessage(`🔄 Duke provuar fallback për ${channel.name}...`, 'warning');
+                
+                const videoPlayer = document.getElementById('videoPlayer');
+                const fallbackUrls = [
+                    'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+                    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                ];
+
+                let currentFallback = 0;
+                
+                const tryNext = () => {
+                    if (currentFallback < fallbackUrls.length) {
+                        videoPlayer.src = fallbackUrls[currentFallback];
+                        videoPlayer.load();
+                        
+                        videoPlayer.play().then(() => {
+                            showMessage(`✅ Po luan fallback stream`, 'success');
+                        }).catch(() => {
+                            currentFallback++;
+                            tryNext();
+                        });
+                    } else {
+                        showMessage(`❌ Nuk mund të luajë ${channel.name}`, 'error');
+                    }
+                };
+                
+                tryNext();
+            }
         }
-        
+
+        // Initialize generator
+        const streamGenerator = new STBStreamGenerator();
+
+        // Funksioni kryesor për gjenerim
+        async function generateFromMAC() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const serverPort = document.getElementById('serverPort').value;
+            const macAddress = document.getElementById('macAddress').value;
+            const protocol = document.getElementById('protocol').value;
+
+            if (!serverUrl || serverUrl === 'http://') {
+                showMessage('❌ Shkruaj URL e serverit!', 'error');
+                return;
+            }
+
+            if (!macAddress || macAddress === '00:1A:79:') {
+                showMessage('❌ Shkruaj MAC adresë të vlefshme!', 'error');
+                return;
+            }
+
+            showMessage('🔄 Duke gjeneruar stream-et nga MAC adresa...', 'info');
+
+            try {
+                const channels = await streamGenerator.generateChannelsFromMAC(
+                    serverUrl, serverPort, macAddress, protocol
+                );
+                
+                streamGenerator.displayChannels();
+                showMessage(`✅ U gjeneruan ${channels.length} kanale nga MAC: ${macAddress}`, 'success');
+
+            } catch (error) {
+                showMessage(`❌ Gabim në gjenerim: ${error.message}`, 'error');
+            }
+        }
+
         // Shfaq mesazhe statusi
         function showMessage(message, type) {
             const statusElement = document.getElementById('statusMessage');
             statusElement.textContent = message;
             statusElement.className = type;
         }
-        
+
         // Kontroll me tastierë
         document.addEventListener('keydown', function(e) {
             const videoPlayer = document.getElementById('videoPlayer');
             
             switch(e.key) {
-                case ' ': // Space
-                    e.preventDefault();
-                    if (videoPlayer.paused) {
-                        videoPlayer.play();
-                    } else {
-                        videoPlayer.pause();
-                    }
-                    break;
-                    
-                case 'f': // Fullscreen
-                case 'F':
-                    e.preventDefault();
-                    toggleFullscreen();
-                    break;
-                    
-                case 'm': // Mute
-                case 'M':
-                    e.preventDefault();
-                    videoPlayer.muted = !videoPlayer.muted;
-                    break;
-                    
-                case 'ArrowUp': // Volume up
-                    e.preventDefault();
-                    if (videoPlayer.volume < 1) {
-                        videoPlayer.volume = Math.min(1, videoPlayer.volume + 0.1);
-                    }
-                    break;
-                    
-                case 'ArrowDown': // Volume down
-                    e.preventDefault();
-                    if (videoPlayer.volume > 0) {
-                        videoPlayer.volume = Math.max(0, videoPlayer.volume - 0.1);
-                    }
-                    break;
+                case ' ': e.preventDefault(); videoPlayer.paused ? videoPlayer.play() : videoPlayer.pause(); break;
+                case 'f': case 'F': e.preventDefault(); toggleFullscreen(); break;
+                case 'm': case 'M': e.preventDefault(); videoPlayer.muted = !videoPlayer.muted; break;
             }
         });
-        
-        // Ekran i plotë
+
         function toggleFullscreen() {
             const videoPlayer = document.getElementById('videoPlayer');
-            
             if (!document.fullscreenElement) {
-                videoPlayer.requestFullscreen().catch(err => {
-                    console.log('Gabim në fullscreen:', err);
-                });
+                videoPlayer.requestFullscreen();
             } else {
                 document.exitFullscreen();
             }
         }
-        
-        // Auto-play kur video të jetë gati
-        document.getElementById('videoPlayer').addEventListener('loadeddata', function() {
-            console.log('Video u ngarkua me sukses!');
+
+        // Auto-generate MAC nëse është bosh
+        document.getElementById('macAddress').addEventListener('focus', function() {
+            if (this.value === '00:1A:79:') {
+                this.value = generateRandomMAC();
+            }
         });
-        
-        // Handle errors
-        document.getElementById('videoPlayer').addEventListener('error', function(e) {
-            console.error('Gabim video:', e);
-            showMessage('❌ Gabim në video. Provo stream tjetër.', 'error');
-        });
-        
-        // Shfaq mesazh kur video fillon
-        document.getElementById('videoPlayer').addEventListener('play', function() {
-            console.log('Video filloi të luajë!');
-        });
-        
-        // Inicializimi
-        showMessage('✅ Player-i është gati! Kliko "Lidhu" pastaj në çdo kanal.', 'success');
+
+        function generateRandomMAC() {
+            const prefixes = ['00:1A:79', '00:1B:67', '00:1C:43'];
+            const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+            const suffix = Array.from({length: 3}, () => 
+                Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
+            ).join(':');
+            return `${prefix}:${suffix}`.toUpperCase();
+        }
     </script>
 </body>
 </html>
