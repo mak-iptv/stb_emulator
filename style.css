@@ -244,3 +244,28 @@ h1 {
         gap: 10px;
     }
 }
+.channel-url {
+    font-size: 10px;
+    color: #95a5a6;
+    margin-top: 2px;
+    font-family: monospace;
+}
+
+.playlist-item.active .channel-url {
+    color: #ecf0f1;
+}
+
+#loadingMessage {
+    font-weight: bold;
+}
+
+/* Stil për video container */
+.player {
+    position: relative;
+}
+
+/* Error message style */
+.error-message {
+    background: #e74c3c !important;
+    color: white !important;
+}
