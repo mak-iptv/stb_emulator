@@ -576,3 +576,178 @@ function changeQuality() {
 document.addEventListener('DOMContentLoaded', function() {
     stbPlayer = new STBPlayer();
 });
+
+// Në script.js, shto këtë funksion për të kontrolluar formatet
+function checkStreamCompatibility(url) {
+    const supportedFormats = ['.m3u8', '.mp4', '.mpd', '.ts'];
+    const isSupported = supportedFormats.some(format => url.includes(format));
+    
+    if (!isSupported) {
+        console.warn('Format i pambështetur:', url);
+        return false;
+    }
+    return true;
+}
+
+// Modifiko funksionin playChannel
+function playChannel(channel) {
+    if (!checkStreamCompatibility(channel.url)) {
+        showMessage('Formati i stream-it nuk mbështetet nga browser-i', 'error');
+        return;
+    }
+    // ... pjesa tjetër e kodit
+}
+
+// Shto këto stream-e testuese në klasën STBPlayer
+getFallbackStreamUrls() {
+    return [
+        'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8', // HLS test
+        'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', // MP4 test
+        'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8' // Live HLS test
+    ];
+}
+
+// Modifiko handleStreamError
+handleStreamError(channel) {
+    console.error('Stream error për:', channel.name);
+    
+    const fallbackUrls = this.getFallbackStreamUrls();
+    let currentFallbackIndex = 0;
+    
+    const tryNextFallback = () => {
+        if (currentFallbackIndex < fallbackUrls.length) {
+            const fallbackUrl = fallbackUrls[currentFallbackIndex];
+            this.showMessage(`Duke provuar stream fallback ${currentFallbackIndex + 1}...`, 'info');
+            
+            const videoPlayer = document.getElementById('videoPlayer');
+            videoPlayer.src = fallbackUrl;
+            videoPlayer.load();
+            
+            videoPlayer.play().then(() => {
+                this.showMessage('Stream fallback u lidh me sukses!', 'success');
+            }).catch(() => {
+                currentFallbackIndex++;
+                tryNextFallback();
+            });
+        } else {
+            this.showMessage('Të gjitha stream-et fallback dështuan', 'error');
+        }
+    };
+    
+    tryNextFallback();
+}
+// Shto këtë funksion për debug
+setupVideoDebugging() {
+    const videoPlayer = document.getElementById('videoPlayer');
+    
+    videoPlayer.addEventListener('error', (e) => {
+        console.error('Video Error:', videoPlayer.error);
+        console.error('Error Code:', videoPlayer.error?.code);
+        console.error('Error Message:', videoPlayer.error?.message);
+        
+        this.showDetailedError(videoPlayer.error);
+    });
+    
+    videoPlayer.addEventListener('loadstart', () => {
+        console.log('Video load start');
+        this.updateStatus('🔄 Duke filluar ngarkimin...', 'loading');
+    });
+    
+    videoPlayer.addEventListener('canplay', () => {
+        console.log('Video can play');
+        this.updateStatus('✅ Video gati për luajtje', 'success');
+    });
+}
+
+showDetailedError(error) {
+    if (!error) {
+        this.showMessage('Gabim i panjohur në video', 'error');
+        return;
+    }
+    
+    const errorMessages = {
+        1: 'Video u anulua',
+        2: 'Problem në rrjet',
+        3: 'Video e dëmtuar ose format i pambështetur',
+        4: 'Video nuk mund të dekodohet'
+    };
+    
+    const message = errorMessages[error.code] || 'Gabim i panjohur në video';
+    this.showMessage(`${message} (Kodi: ${error.code})`, 'error');
+}
+
+// Funksion për të përdorur CORS proxy
+async getStreamWithProxy(url) {
+    // Provim direkt
+    try {
+        const testResponse = await fetch(url, { method: 'HEAD' });
+        if (testResponse.ok) return url;
+    } catch (error) {
+        console.log('Stream kërkon CORS proxy');
+    }
+    
+    // Përdor CORS proxy
+    const proxyUrls = [
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        `https://cors-anywhere.herokuapp.com/${url}`
+    ];
+    
+    return proxyUrls[0]; // Kthe proxy-n e parë
+}
+
+// Modifiko playChannel për të përdorur proxy
+async playChannel(channel) {
+    try {
+        const streamUrl = await this.getStreamWithProxy(channel.url);
+        const videoPlayer = document.getElementById('videoPlayer');
+        
+        videoPlayer.src = streamUrl;
+        videoPlayer.load();
+        
+        await videoPlayer.play();
+        this.updateStatus(`▶️ Duke luajtur: ${channel.name}`, 'success');
+        
+    } catch (error) {
+        console.error('Gabim në play:', error);
+        this.handleStreamError(channel);
+    }
+}
+// Shto këtë në klasën STBPlayer
+enableTestMode() {
+    this.testMode = true;
+    this.addTestChannels();
+}
+
+addTestChannels() {
+    const testChannels = [
+        {
+            id: 9991,
+            name: 'TEST - Big Buck Bunny (MP4)',
+            url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+            category: 'Test',
+            quality: 'HD',
+            isOnline: true
+        },
+        {
+            id: 9992,
+            name: 'TEST - HLS Stream',
+            url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+            category: 'Test',
+            quality: 'HD',
+            isOnline: true
+        },
+        {
+            id: 9993,
+            name: 'TEST - Elephant Dream (MP4)',
+            url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+            category: 'Test',
+            quality: 'HD',
+            isOnline: true
+        }
+    ];
+    
+    this.channels = [...testChannels, ...this.channels];
+    this.displayChannels();
+    this.showMessage('Test Mode u aktivizua!', 'success');
+}
