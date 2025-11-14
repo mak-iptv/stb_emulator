@@ -1,278 +1,126 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="sq">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>IPTV Debug Player — Fix CORS & Load</title>
-  <style>
-    body{font-family:Inter,Arial,Helvetica;margin:12px;background:#071427;color:#e9f8ff}
-    .wrap{max-width:1100px;margin:0 auto}
-    header{display:flex;align-items:center;justify-content:space-between;gap:10px}
-    input,select,button,textarea{font-size:14px}
-    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    input[type=text]{padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);min-width:420px;background:transparent;color:inherit}
-    button{padding:8px 10px;border-radius:6px;border:0;background:#00c2d8;color:#012;cursor:pointer}
-    button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#9fb0c4}
-    main{display:grid;grid-template-columns:420px 1fr;gap:12px;margin-top:12px}
-    .left,.right{background:#071a2a;padding:12px;border-radius:10px}
-    video{width:100%;height:260px;background:#000;display:block;border-radius:6px}
-    .channels{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
-    .card{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;display:flex;gap:8px;align-items:center;cursor:pointer}
-    .card img{width:88px;height:50px;object-fit:cover;border-radius:6px}
-    .log{background:#02121b;color:#9fd6e3;padding:8px;border-radius:6px;max-height:180px;overflow:auto;font-size:13px}
-    textarea{width:100%;height:120px;background:transparent;color:inherit;border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:8px}
-    .note{color:#9fb0c4;font-size:13px;margin-top:8px}
-    @media(max-width:900px){main{grid-template-columns:1fr}video{height:200px}}
-  </style>
+<meta charset="UTF-8" />
+<title>IPTV Player (TS + M3U8)</title>
+<style>
+  body {margin:0;background:#000;font-family:Arial;color:white;display:flex;height:100vh;}
+  #sidebar {width:320px;background:#111;overflow-y:auto;border-right:2px solid #222;padding:10px;}
+  #player {flex:1;display:flex;flex-direction:column;}
+  video {width:100%;height:100%;background:#000;}
+  .item {padding:8px;background:#222;margin-bottom:6px;border-radius:6px;cursor:pointer;}
+  .item:hover {background:#444;}
+  input{width:100%;padding:5px;border-radius:5px;border:1px solid #333;background:#111;color:white;margin-bottom:10px;}
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div><h2 style="margin:0">IPTV Debug Player — (auto CORS fallback)</h2><div class="note">Nëse URL nuk ngarkohet: shiko Log / përdor paste.</div></div>
-      <div><small style="color:#9fb0c4">Test & fix</small></div>
-    </header>
 
-    <div class="controls">
-      <input id="m3uUrl" placeholder="Ngjit URL M3U ose HLS (.m3u8)..." />
-      <button id="btnLoad">Ngarko</button>
-      <label class="ghost" style="padding:8px;border-radius:6px;cursor:pointer">Ngarko skedarin<input id="file" type="file" accept=".m3u,.txt" style="display:none"></label>
-      <select id="proxyChoice" title="Proxy fallback">
-        <option value="none">Pa proxy (përdor fetch direkt)</option>
-        <option value="allorigins">Use AllOrigins (api.allorigins.win)</option>
-        <option value="odyssey">Use Odyssey CORS Proxy</option>
-        <option value="auto">Auto (try direct, then proxies)</option>
-      </select>
-      <button id="btnPaste" class="ghost">Ngjit M3U (teksti)</button>
-    </div>
+<div id="sidebar">
+  <input id="m3uUrl" placeholder="Vendos URL të M3U" />
+  <button onclick="loadM3U()">Ngarko</button>
+  <div id="channels"></div>
+</div>
 
-    <main>
-      <section class="left">
-        <div class="player">
-          <video id="video" controls playsinline></video>
-        </div>
+<div id="player">
+  <video id="vid" controls autoplay></video>
+</div>
 
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button id="playPause">Play/Pause</button>
-          <button id="volDown" class="ghost">Vol -</button>
-          <button id="volUp" class="ghost">Vol +</button>
-        </div>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+let list = [];
 
-        <div style="margin-top:10px">
-          <strong>Pane Log</strong>
-          <div id="log" class="log"></div>
-        </div>
+async function fetchURL(url) {
+  try {
+    return await fetch(url);
+  } catch (e) {
+    return await fetch("https://cors-proxy.odyssey.workers.dev/?" + encodeURIComponent(url));
+  }
+}
 
-        <div style="margin-top:8px">
-          <strong>Ngjit M3U (për test)</strong>
-          <textarea id="pasteArea" placeholder="Ngjit këtu përmbajtjen e skedarit .m3u dhe kliko \"Përpunoj\""></textarea>
-          <div style="display:flex;gap:8px;margin-top:6px">
-            <button id="btnProcess">Përpunoj</button>
-            <button id="btnClear" class="ghost">Pastro kanalet</button>
-          </div>
-        </div>
-      </section>
+async function loadM3U() {
+  const url = document.getElementById("m3uUrl").value.trim();
+  if (!url) return;
 
-      <section class="right">
-        <div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <strong>Kanale</strong>
-            <div id="count" style="color:#9fb0c4">0</div>
-          </div>
+  const res = await fetchURL(url);
+  const text = await res.text();
 
-          <div id="channels" class="channels" aria-live="polite"></div>
-        </div>
-        <div class="note" style="margin-top:10px">Nëse sërish nuk ngarkon: ç'ishte log-i? Kopjo dhe ma dërgo (ose ngjit një pjesë të M3U për test).</div>
-      </section>
-    </main>
-  </div>
+  list = parseM3U(text);
+  render();
+}
 
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script>
-    // Helpers
-    const logEl = document.getElementById('log');
-    function log(...args){ const t = document.createElement('div'); t.textContent = '['+new Date().toLocaleTimeString()+'] ' + args.join(' '); logEl.prepend(t); }
-    function clearLog(){ logEl.innerHTML=''; }
-
-    // M3U parser (robust)
-    function parseM3U(text){
-      const lines = text.split(/\\r?\\n/);
-      const items = [];
-      let info = null;
-      for(const raw of lines){
-        const line = raw.trim();
-        if(!line) continue;
-        if(line.startsWith('#EXTINF')){
-          info = line;
-        } else if(line.startsWith('#')) {
-          // ignore
-        } else {
-          const url = line;
-          if(info){
-            const payload = info.substring(8);
-            const attrs = {};
-            const re = /(\\w[\\w-]*?)\\s*=\\s*\"([^"]*)\"/g;
-            let m;
-            while((m=re.exec(payload))!==null) attrs[m[1]] = m[2];
-            const comma = payload.indexOf(',');
-            const name = comma !== -1 ? payload.substring(comma+1).trim() : (attrs.title || url);
-            const logo = attrs['tvg-logo']||attrs.logo||'';
-            items.push({name, url, logo});
-            info = null;
-          } else {
-            items.push({name: url, url, logo: ''});
-          }
-        }
-      }
-      return items;
+function parseM3U(text) {
+  const lines = text.split(/\r?\n/);
+  let ch = [];
+  let name = "";
+  for (let i=0;i<lines.length;i++){
+    if (lines[i].startsWith("#EXTINF")){
+      const m = lines[i].match(/,(.*)$/);
+      name = m ? m[1] : "Pa emër";
+    } else if (lines[i].startsWith("http")){
+      ch.push({name, url:lines[i]});
     }
+  }
+  return ch;
+}
 
-    // DOM refs
-    const video = document.getElementById('video');
-    const channelsEl = document.getElementById('channels');
-    const countEl = document.getElementById('count');
-    const urlInput = document.getElementById('m3uUrl');
-    const fileInput = document.getElementById('file');
-    const btnLoad = document.getElementById('btnLoad');
-    const proxyChoice = document.getElementById('proxyChoice');
-    const btnPaste = document.getElementById('btnPaste');
-    const pasteArea = document.getElementById('pasteArea');
-    const btnProcess = document.getElementById('btnProcess');
-    const btnClear = document.getElementById('btnClear');
+function render() {
+  const box = document.getElementById("channels");
+  box.innerHTML = "";
+  list.forEach((c,i)=>{
+    const div = document.createElement("div");
+    div.className = "item";
+    div.textContent = c.name;
+    div.onclick = ()=> play(c.url);
+    box.appendChild(div);
+  });
+}
 
-    let items = [];
-    let hls = null;
+function play(url) {
+  const video = document.getElementById("vid");
 
-    // Try fetch with fallback proxies sequence
-    async function tryFetchWithFallback(url, mode){
-      // mode: 'none' | 'allorigins' | 'odyssey' | 'auto'
-      const controllers = [];
-      function timeoutFetch(resource, init, ms=10000){
-        const controller = new AbortController(); controllers.push(controller);
-        const id = setTimeout(()=>controller.abort(), ms);
-        return fetch(resource, {...init, signal: controller.signal}).finally(()=> clearTimeout(id));
-      }
-
-      const proxies = [];
-      if(mode === 'none') proxies.push({label:'direct', fn: u => u});
-      else if(mode === 'allorigins') proxies.push({label:'allorigins', fn: u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)});
-      else if(mode === 'odyssey') proxies.push({label:'odyssey', fn: u => 'https://cors-proxy.odyssey.workers.dev/?' + encodeURIComponent(u)});
-      else { // auto: try direct then allorigins then odyssey
-        proxies.push({label:'direct', fn: u => u});
-        proxies.push({label:'allorigins', fn: u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)});
-        proxies.push({label:'odyssey', fn: u => 'https://cors-proxy.odyssey.workers.dev/?' + encodeURIComponent(u)});
-      }
-
-      let lastErr = null;
-      for(const p of proxies){
-        const attemptUrl = p.fn(url);
-        log('Provoni:', p.label, attemptUrl);
-        try{
-          const res = await timeoutFetch(attemptUrl, {method:'GET'}, 12000);
-          if(!res.ok) { lastErr = 'HTTP '+res.status+' for '+p.label; log('HTTP status', res.status); throw new Error('HTTP '+res.status); }
-          const text = await res.text();
-          log('Sukses me', p.label);
-          return text;
-        } catch(err){
-          log('Dështoi', p.label, err.message || err);
-          lastErr = err;
-          // continue to next proxy
-        }
-      }
-      throw lastErr;
+  // LUAN M3U8 ME HLS.JS
+  if (url.endsWith(".m3u8")) {
+    if (Hls.isSupported()){
+      video.src = "";
+      const hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      return;
+    } else {
+      video.src = url;
+      return;
     }
+  }
 
-    // Render channels
-    function renderChannels(list){
-      channelsEl.innerHTML = '';
-      list.forEach((c, idx)=>{
-        const el = document.createElement('div'); el.className='card';
-        const img = document.createElement('img'); img.src = c.logo || 'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"90\"><rect width=\"100%\" height=\"100%\" fill=\"#052133\"/></svg>';
-        const meta = document.createElement('div'); meta.style.flex='1';
-        meta.innerHTML = `<div style="font-weight:600">${escapeHtml(c.name)}</div><div style="font-size:12px;color:#9fb0c4">${escapeHtml(c.url)}</div>`;
-        el.appendChild(img); el.appendChild(meta);
-        el.addEventListener('click', ()=> playUrl(c.url));
-        channelsEl.appendChild(el);
-      });
-      countEl.textContent = list.length;
+  // LUAN .TS (DIRECT TS)
+  if (url.endsWith(".ts")) {
+    // Shumica e shfletuesve nuk e luajnë TS direkt → përdorim MediaSource
+    try {
+      playTS(url);
+    } catch (e) {
+      alert("TS nuk u luajt. Duhet .m3u8 ose server transkodimi.");
     }
+    return;
+  }
 
-    function escapeHtml(s){ return String(s||'').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]||c)); }
+  // default
+  video.src = url;
+}
 
-    // Play URL (HLS support)
-    function playUrl(src){
-      log('Luaj: ' + src);
-      if(src.includes('.m3u8')){
-        if(window.Hls && Hls.isSupported()){
-          if(hls){ try{ hls.destroy(); }catch(e){} hls = null; }
-          hls = new Hls();
-          hls.loadSource(src);
-          hls.attachMedia(video);
-          hls.on(Hls.Events.MANIFEST_PARSED, ()=> video.play().catch(()=>{}));
-        } else {
-          video.src = src; video.play().catch(e=> log('Video play error', e.message));
-        }
-      } else {
-        video.src = src;
-        video.play().catch(e=> log('Video play error (likely CORS/format):', e.message));
-      }
-    }
+// PROVIMI ME MediaSource PËR TS
+async function playTS(url){
+  const video = document.getElementById("vid");
+  const ms = new MediaSource();
+  video.src = URL.createObjectURL(ms);
 
-    // Handlers
-    btnLoad.addEventListener('click', async ()=>{
-      const url = urlInput.value.trim();
-      if(!url) return alert('Vendos URL!');
-      clearLog();
-      log('Duke ngarkuar URL:', url);
-      const mode = proxyChoice.value === 'auto' ? 'auto' : proxyChoice.value;
-      try{
-        const text = await tryFetchWithFallback(url, mode);
-        items = parseM3U(text);
-        renderChannels(items);
-        if(items.length) playUrl(items[0].url);
-        log('Playlist parsed, ' + items.length + ' kanale');
-      } catch(err){
-        log('Gabim i përgjithshëm gjatë fetch:', err && err.message ? err.message : err);
-        alert('Gabim: ' + (err && err.message ? err.message : 'dështoi fetch - shiko Log për detaje'));
-      }
-    });
+  ms.addEventListener("sourceopen", async ()=>{
+    const sb = ms.addSourceBuffer('video/mp2t; codecs="avc1.4d401e, mp4a.40.2"');
+    const r = await fetchURL(url);
+    const data = await r.arrayBuffer();
+    sb.appendBuffer(data);
+  });
+}
+</script>
 
-    fileInput.addEventListener('change', e=>{
-      const f = e.target.files[0]; if(!f) return;
-      const r = new FileReader();
-      r.onload = ev => {
-        try{
-          items = parseM3U(ev.target.result);
-          renderChannels(items);
-          if(items.length) playUrl(items[0].url);
-          log('Skedari u ngarkua, ' + items.length + ' kanale');
-        } catch(err){ log('Gabim parse file', err.message || err); alert('Gabim gjatë parsimit'); }
-      };
-      r.readAsText(f);
-    });
-
-    btnPaste.addEventListener('click', ()=>{ pasteArea.focus(); });
-
-    btnProcess.addEventListener('click', ()=>{
-      const txt = pasteArea.value.trim();
-      if(!txt) return alert('Ngjit M3U këtu!');
-      try{
-        items = parseM3U(txt);
-        renderChannels(items);
-        if(items.length) playUrl(items[0].url);
-        log('Teksti M3U përpunuar, ' + items.length + ' kanale');
-      } catch(err){ log('Gabim parse paste', err.message || err); alert('Gabim during parse'); }
-    });
-
-    btnClear.addEventListener('click', ()=>{ items=[]; renderChannels([]); video.pause(); video.removeAttribute('src'); countEl.textContent='0'; });
-
-    // volume controls
-    document.getElementById('volUp').addEventListener('click', ()=> video.volume = Math.min(1, video.volume + 0.1));
-    document.getElementById('volDown').addEventListener('click', ()=> video.volume = Math.max(0, video.volume - 0.1));
-    document.getElementById('playPause').addEventListener('click', ()=> video.paused ? video.play() : video.pause());
-
-    // initial log
-    log('Ready. Nëse URL nuk ngarkohet mund të provosh: 1) zgjidh "Auto" në proxy, 2) Ngjit tek M3U në zonën e tekstit, ose 3) Ngarko skedarin lokal.');
-
-  </script>
 </body>
 </html>
