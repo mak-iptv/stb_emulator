@@ -1,74 +1,36 @@
 <!DOCTYPE html>
-<html lang="sq">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stalker Portal Player</title>
+    <title>IPTV Web Player</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="stb-container">
-        <div class="player-header">
-            <h1>Stalker Portal Player</h1>
-            <div class="mac-display">MAC: <span id="macAddress">00:1A:79:00:00:00</span></div>
-            <div class="status" id="connectionStatus">I palidhur</div>
-        </div>
-
-        <div class="portal-config">
-            <h3>Konfigurimi i Portalit</h3>
-            <div class="config-form">
-                <div class="input-group">
-                    <label>Portal URL:</label>
-                    <input type="text" id="portalUrl" placeholder="http://tv.example.com:80" value="http://localhost:80">
-                </div>
-                <div class="input-group">
-                    <label>MAC Address:</label>
-                    <input type="text" id="macAddressInput" placeholder="00:1A:79:XX:XX:XX" value="00:1A:79:00:00:01">
-                </div>
-                <div class="input-group">
-                    <label>Username (opsional):</label>
-                    <input type="text" id="username" placeholder="username">
-                </div>
-                <div class="input-group">
-                    <label>Password (opsional):</label>
-                    <input type="password" id="password" placeholder="password">
-                </div>
-                <button id="connectBtn">Lidhu me Portal</button>
+    <div class="container">
+        <header>
+            <h1>IPTV Web Player</h1>
+            <div class="controls">
+                <input type="text" id="m3uUrl" placeholder="Enter M3U URL or file">
+                <input type="file" id="m3uFile" accept=".m3u,.m3u8">
+                <button id="loadPlaylist">Load Playlist</button>
             </div>
-        </div>
+        </header>
 
-        <div class="connection-info" id="connectionInfo" style="display: none;">
-            <h3>Informacion i Lidhjes</h3>
-            <div id="serverInfo"></div>
-        </div>
+        <div class="main-content">
+            <div class="channel-list">
+                <h3>Channels</h3>
+                <div id="channelList"></div>
+            </div>
 
-        <div class="video-container">
-            <video id="videoPlayer" controls style="display: none;">
-                Shfletuesi juaj nuk mbështet videon HTML5.
-            </video>
-            <div class="loading" id="loading">Duke u lidhur me portal...</div>
-        </div>
-
-        <div class="controls" style="display: none;" id="playerControls">
-            <button id="playBtn">Play</button>
-            <button id="pauseBtn">Pause</button>
-            <button id="fullscreenBtn">Fullscreen</button>
-            <button id="stopBtn">Stop</button>
-        </div>
-
-        <div class="categories" id="categoriesContainer" style="display: none;">
-            <h3>Kategoritë</h3>
-            <div id="categoriesList"></div>
-        </div>
-
-        <div class="channels" id="channelsContainer" style="display: none;">
-            <h3>Kanale</h3>
-            <div id="channelsList"></div>
-        </div>
-
-        <div class="logs">
-            <h3>Logs</h3>
-            <div id="logContainer"></div>
+            <div class="video-player">
+                <video id="videoPlayer" controls>
+                    Your browser does not support the video tag.
+                </video>
+                <div class="player-info">
+                    <h3 id="currentChannel">No channel selected</h3>
+                </div>
+            </div>
         </div>
     </div>
 
