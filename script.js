@@ -751,3 +751,7 @@ addTestChannels() {
     this.displayChannels();
     this.showMessage('Test Mode u aktivizua!', 'success');
 }
+function enableTestMode() {
+    if (!stbPlayer) stbPlayer = new STBPlayer();
+    stbPlayer.enableTestMode();
+}
