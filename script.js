@@ -191,3 +191,18 @@ class STBPlayer {
 document.addEventListener('DOMContentLoaded', () => {
     new STBPlayer();
 });
+
+// Shembull i kërkesës aktuale
+async function connectToRealServer() {
+    const response = await fetch('http://your-server:port/c', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            mac: '00:A1:79:XX:XX:XX',
+            action: 'authenticate'
+        })
+    });
+    return await response.json();
+}
