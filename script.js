@@ -1,249 +1,578 @@
-let channels = [];
-let currentChannel = null;
-let isMuted = false;
-
-// Funksioni për të lidhur me server STB
-async function loadSTBChannels() {
-    const serverUrl = document.getElementById('serverUrl').value;
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    
-    if (!serverUrl || !username || !password) {
-        alert('Ju lutem plotësoni të gjitha fushat!');
-        return;
-    }
-    
-    updateStatus('Duke u lidhur me server...', 'loading');
-    
-    try {
-        // Simulim të dhënash STB (në praktikë do të kishe nevojë për API të vërtetë)
-        const mockChannels = [
-            { name: 'RTSH 1 HD', url: 'http://example.com/stream1.m3u8', category: 'Shqipëri', quality: 'HD' },
-            { name: 'RTSH 2', url: 'http://example.com/stream2.m3u8', category: 'Shqipëri', quality: 'SD' },
-            { name: 'Top Channel HD', url: 'http://example.com/stream3.m3u8', category: 'Shqipëri', quality: 'HD' },
-            { name: 'CNN International', url: 'http://example.com/stream4.m3u8', category: 'Ndotëror', quality: 'HD' },
-            { name: 'Discovery Science', url: 'http://example.com/stream5.m3u8', category: 'Dokumentar', quality: 'HD' }
-        ];
+class STBPlayer {
+    constructor() {
+        this.serverUrl = '';
+        this.macAddress = '';
+        this.port = '8080';
+        this.isConnected = false;
+        this.channels = [];
+        this.currentChannel = null;
+        this.profiles = JSON.parse(localStorage.getItem('stbProfiles')) || [];
         
-        channels = mockChannels;
-        displayChannels();
-        updateStatus('I lidhur me sukses', 'connected');
-        
-    } catch (error) {
-        console.error('Gabim në lidhje:', error);
-        updateStatus('Gabim në lidhje', 'error');
+        this.initializeApp();
     }
-}
 
-// Funksioni për ngarkimin e skedarit M3U
-function loadM3UFile() {
-    const fileInput = document.getElementById('m3uFile');
-    const file = fileInput.files[0];
-    
-    if (!file) {
-        alert('Zgjidhni një skedar M3U!');
-        return;
+    initializeApp() {
+        this.updateTime();
+        setInterval(() => this.updateTime(), 1000);
+        this.loadProfiles();
+        this.setupEventListeners();
     }
-    
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-        parseM3UContent(e.target.result);
-        displayChannels();
-        updateStatus(`U ngarkuan ${channels.length} kanale`, 'success');
-    };
-    
-    reader.onerror = function() {
-        updateStatus('Gabim në leximin e skedarit', 'error');
-    };
-    
-    reader.readAsText(file);
-}
 
-// Funksioni për parsimin e përmbajtjes M3U
-function parseM3UContent(content) {
-    channels = [];
-    const lines = content.split('\n');
-    let currentChannel = {};
-    
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+    setupEventListeners() {
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
         
-        if (line.startsWith('#EXTINF:')) {
-            // Nxjerr informacionin e kanalit
-            const info = parseExtinf(line);
-            currentChannel = {
-                name: info.name,
-                url: '',
-                category: info.group || 'Të tjera',
-                quality: info.quality || 'SD'
+        // Video player events
+        const videoPlayer = document.getElementById('videoPlayer');
+        videoPlayer.addEventListener('loadedmetadata', () => this.onVideoLoaded());
+        videoPlayer.addEventListener('error', () => this.onVideoError());
+        videoPlayer.addEventListener('waiting', () => this.onVideoBuffering());
+        videoPlayer.addEventListener('playing', () => this.onVideoPlaying());
+    }
+
+    async connectToServer() {
+        this.serverUrl = document.getElementById('serverUrl').value;
+        this.port = document.getElementById('serverPort').value;
+        this.macAddress = document.getElementById('macAddress').value;
+        const deviceType = document.getElementById('deviceType').value;
+
+        if (!this.validateInputs()) {
+            return;
+        }
+
+        this.updateStatus('🔄 Duke u lidhur me server...', 'loading');
+        
+        try {
+            // Simulojmë lidhjen me serverin STB
+            await this.simulateSTBConnection();
+            
+            this.isConnected = true;
+            this.updateServerInfo();
+            this.loadChannels();
+            this.updateStatus('✅ U lidh me sukses!', 'success');
+            
+        } catch (error) {
+            console.error('Gabim në lidhje:', error);
+            this.updateStatus('❌ Gabim në lidhje me server', 'error');
+        }
+    }
+
+    validateInputs() {
+        if (!this.serverUrl || !this.port || !this.macAddress) {
+            this.showMessage('Ju lutem plotësoni të gjitha fushat!', 'error');
+            return false;
+        }
+
+        if (!this.isValidMacAddress(this.macAddress)) {
+            this.showMessage('MAC Address jo valid! Format i pranueshëm: 00:1A:79:XX:XX:XX', 'error');
+            return false;
+        }
+
+        return true;
+    }
+
+    isValidMacAddress(mac) {
+        const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+        return macRegex.test(mac);
+    }
+
+    async simulateSTBConnection() {
+        // Simulojmë një vonesë të lidhjes
+        return new Promise((resolve, reject) => {
+            setTimeout(() => {
+                // 90% shans sukses për demonstrim
+                if (Math.random() > 0.1) {
+                    resolve({
+                        status: 'connected',
+                        server: this.serverUrl,
+                        mac: this.macAddress,
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    reject(new Error('Server-i nuk u gjet ose nuk është i disponueshëm'));
+                }
+            }, 2000);
+        });
+    }
+
+    async loadChannels() {
+        this.updateStatus('📡 Duke ngarkuar kanalet...', 'loading');
+        
+        try {
+            // Kanale simulime për demonstrim
+            const mockChannels = this.generateMockChannels();
+            this.channels = mockChannels;
+            
+            this.displayChannels();
+            this.updateStatus(`✅ U ngarkuan ${this.channels.length} kanale`, 'success');
+            
+        } catch (error) {
+            console.error('Gabim në ngarkimin e kanaleve:', error);
+            this.updateStatus('❌ Gabim në ngarkimin e kanaleve', 'error');
+        }
+    }
+
+    generateMockChannels() {
+        const categories = ['Shqipëri', 'Filma', 'Sport', 'Lajme', 'Dokumentar', 'Muzik', 'Fëmijë'];
+        const qualities = ['SD', 'HD', 'FHD', '4K'];
+        
+        return Array.from({ length: 50 }, (_, i) => {
+            const category = categories[Math.floor(Math.random() * categories.length)];
+            const quality = qualities[Math.floor(Math.random() * qualities.length)];
+            
+            return {
+                id: i + 1,
+                name: `${this.getChannelName(i)} ${quality}`,
+                url: this.generateStreamUrl(i, quality),
+                category: category,
+                quality: quality,
+                bitrate: this.getBitrate(quality),
+                resolution: this.getResolution(quality),
+                isOnline: Math.random() > 0.1 // 90% online
             };
-        } else if (line && !line.startsWith('#') && currentChannel.name) {
-            // URL e stream-it
-            currentChannel.url = line;
-            channels.push(currentChannel);
-            currentChannel = {};
+        });
+    }
+
+    getChannelName(index) {
+        const names = [
+            'RTSH', 'Top Channel', 'Klan', 'Vizion Plus', 'ABC News', 'Discovery', 
+            'National Geographic', 'Film Hits', 'Action TV', 'Sports Max',
+            'News 24', 'Music Box', 'Kids World', 'Movie Central', 'Documentary HD'
+        ];
+        return names[index % names.length] + ' ' + (Math.floor(index / names.length) + 1);
+    }
+
+    generateStreamUrl(channelId, quality) {
+        // URL simulim stream-i
+        const formats = ['m3u8', 'mp4', 'ts'];
+        const format = formats[Math.floor(Math.random() * formats.length)];
+        return `http://stream-server.com/channel${channelId}/${quality}.${format}`;
+    }
+
+    getBitrate(quality) {
+        const bitrates = { 'SD': '1.5 Mbps', 'HD': '3 Mbps', 'FHD': '6 Mbps', '4K': '15 Mbps' };
+        return bitrates[quality] || '1.5 Mbps';
+    }
+
+    getResolution(quality) {
+        const resolutions = { 'SD': '720x576', 'HD': '1280x720', 'FHD': '1920x1080', '4K': '3840x2160' };
+        return resolutions[quality] || '720x576';
+    }
+
+    displayChannels() {
+        const channelList = document.getElementById('channelList');
+        const categoryFilter = document.getElementById('categoryFilter');
+        
+        // Pastro listën
+        channelList.innerHTML = '';
+        
+        // Përditëso kategoritë
+        const categories = [...new Set(this.channels.map(ch => ch.category))];
+        categoryFilter.innerHTML = '<option value="">Të gjitha kategoritë</option>';
+        categories.forEach(cat => {
+            categoryFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
+        });
+        
+        // Shfaq kanalet
+        const filteredChannels = this.getFilteredChannels();
+        
+        if (filteredChannels.length === 0) {
+            channelList.innerHTML = '<div class="empty-state">Nuk u gjetën kanale</div>';
+            return;
+        }
+        
+        filteredChannels.forEach(channel => {
+            const channelElement = this.createChannelElement(channel);
+            channelList.appendChild(channelElement);
+        });
+        
+        this.updateChannelStats();
+    }
+
+    createChannelElement(channel) {
+        const div = document.createElement('div');
+        div.className = `channel-item ${channel.isOnline ? '' : 'offline'}`;
+        div.innerHTML = `
+            <div class="channel-info">
+                <div class="channel-name">${channel.name}</div>
+                <div class="channel-meta">${channel.category} • ${channel.quality}</div>
+            </div>
+            <div class="channel-status">
+                ${channel.isOnline ? '🟢' : '🔴'}
+            </div>
+        `;
+        
+        if (channel.isOnline) {
+            div.onclick = () => this.playChannel(channel);
+        }
+        
+        return div;
+    }
+
+    getFilteredChannels() {
+        const searchTerm = document.getElementById('searchChannels').value.toLowerCase();
+        const category = document.getElementById('categoryFilter').value;
+        const quality = document.getElementById('qualityFilter').value;
+        
+        return this.channels.filter(channel => {
+            const matchesSearch = channel.name.toLowerCase().includes(searchTerm);
+            const matchesCategory = !category || channel.category === category;
+            const matchesQuality = !quality || channel.quality === quality;
+            const isOnline = channel.isOnline;
+            
+            return matchesSearch && matchesCategory && matchesQuality && isOnline;
+        });
+    }
+
+    playChannel(channel) {
+        if (!channel.isOnline) {
+            this.showMessage('Ky kanal nuk është online', 'warning');
+            return;
+        }
+        
+        this.currentChannel = channel;
+        const videoPlayer = document.getElementById('videoPlayer');
+        
+        // Hiq aktivin nga të gjitha kanalet
+        document.querySelectorAll('.channel-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Shto aktiv tek kanali i zgjedhur
+        event.target.closest('.channel-item').classList.add('active');
+        
+        // Përditëso informacionin
+        document.getElementById('currentChannelName').textContent = channel.name;
+        document.getElementById('streamQuality').textContent = channel.quality;
+        document.getElementById('streamBitrate').textContent = channel.bitrate;
+        document.getElementById('streamResolution').textContent = channel.resolution;
+        
+        // Përpiqu të luajë stream-in
+        try {
+            videoPlayer.src = channel.url;
+            videoPlayer.load();
+            
+            videoPlayer.play().then(() => {
+                this.updateStatus(`▶️ Duke luajtur: ${channel.name}`, 'success');
+            }).catch(error => {
+                console.error('Gabim në play:', error);
+                this.handleStreamError(channel);
+            });
+            
+        } catch (error) {
+            console.error('Gabim në ngarkimin e stream-it:', error);
+            this.handleStreamError(channel);
+        }
+    }
+
+    handleStreamError(channel) {
+        this.showMessage(`Nuk mund të luhet stream-i për ${channel.name}. Mund të jetë CORS ose format i pambështetur.`, 'error');
+        
+        // Provim me stream fallback për demonstrim
+        const fallbackUrl = this.getFallbackStreamUrl();
+        if (fallbackUrl) {
+            document.getElementById('videoPlayer').src = fallbackUrl;
+        }
+    }
+
+    getFallbackStreamUrl() {
+        // Një stream publik testues
+        return 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+    }
+
+    updateChannelStats() {
+        const total = this.channels.length;
+        const online = this.channels.filter(ch => ch.isOnline).length;
+        
+        document.getElementById('totalChannels').textContent = `Total: ${total}`;
+        document.getElementById('onlineChannels').textContent = `Online: ${online}`;
+    }
+
+    updateServerInfo() {
+        document.getElementById('serverStatus').textContent = 'Online';
+        document.getElementById('serverStatus').className = 'status-online';
+        document.getElementById('displayMac').textContent = this.macAddress;
+        document.getElementById('displayUrl').textContent = `${this.serverUrl}:${this.port}`;
+        document.getElementById('connectionTime').textContent = new Date().toLocaleTimeString();
+    }
+
+    updateStatus(message, type = 'info') {
+        const statusElement = document.getElementById('connectionStatus');
+        statusElement.textContent = message;
+        
+        // Ndrysho ngjyrën bazuar në tipin
+        statusElement.className = '';
+        if (type === 'error') statusElement.style.color = 'var(--error-color)';
+        else if (type === 'success') statusElement.style.color = 'var(--success-color)';
+        else if (type === 'loading') statusElement.style.color = 'var(--warning-color)';
+        else statusElement.style.color = 'var(--text-color)';
+    }
+
+    updateTime() {
+        document.getElementById('currentTime').textContent = new Date().toLocaleTimeString();
+    }
+
+    // Kontrollet e player-it
+    togglePlay() {
+        const videoPlayer = document.getElementById('videoPlayer');
+        const playBtn = document.getElementById('playBtn');
+        
+        if (videoPlayer.paused) {
+            videoPlayer.play();
+            playBtn.innerHTML = '⏸️ Pause';
+            document.getElementById('playerStatus').textContent = 'Playing';
+        } else {
+            videoPlayer.pause();
+            playBtn.innerHTML = '▶️ Play';
+            document.getElementById('playerStatus').textContent = 'Paused';
+        }
+    }
+
+    toggleMute() {
+        const videoPlayer = document.getElementById('videoPlayer');
+        const muteBtn = document.getElementById('muteBtn');
+        
+        videoPlayer.muted = !videoPlayer.muted;
+        muteBtn.innerHTML = videoPlayer.muted ? '🔇' : '🔊';
+    }
+
+    volumeUp() {
+        const videoPlayer = document.getElementById('videoPlayer');
+        videoPlayer.volume = Math.min(1, videoPlayer.volume + 0.1);
+    }
+
+    volumeDown() {
+        const videoPlayer = document.getElementById('videoPlayer');
+        videoPlayer.volume = Math.max(0, videoPlayer.volume - 0.1);
+    }
+
+    toggleFullscreen() {
+        const videoContainer = document.querySelector('.video-container');
+        
+        if (!document.fullscreenElement) {
+            videoContainer.requestFullscreen().catch(err => {
+                console.error('Gabim në fullscreen:', err);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    reloadStream() {
+        const videoPlayer = document.getElementById('videoPlayer');
+        const currentTime = videoPlayer.currentTime;
+        videoPlayer.src += ''; // Reload source
+        videoPlayer.currentTime = currentTime;
+        videoPlayer.play();
+    }
+
+    // Gjenerimi i MAC
+    generateMac() {
+        const prefixes = ['00:1A:79', '00:1B:67', '00:1C:43', '00:1D:33'];
+        const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+        
+        const suffix = Array.from({ length: 3 }, () => 
+            Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
+        ).join(':');
+        
+        const mac = `${prefix}:${suffix}`.toUpperCase();
+        document.getElementById('macAddress').value = mac;
+    }
+
+    // Menaxhimi i profileve
+    saveProfile() {
+        const profile = {
+            id: Date.now(),
+            name: `Profile ${this.profiles.length + 1}`,
+            serverUrl: this.serverUrl,
+            port: this.port,
+            macAddress: this.macAddress,
+            deviceType: document.getElementById('deviceType').value,
+            createdAt: new Date().toISOString()
+        };
+        
+        this.profiles.push(profile);
+        localStorage.setItem('stbProfiles', JSON.stringify(this.profiles));
+        this.showMessage('Profili u ruajt!', 'success');
+    }
+
+    loadProfiles() {
+        const modal = document.getElementById('profilesModal');
+        const profilesList = document.getElementById('profilesList');
+        
+        profilesList.innerHTML = '';
+        
+        if (this.profiles.length === 0) {
+            profilesList.innerHTML = '<div class="empty-state">Nuk ka profile të ruajtura</div>';
+        } else {
+            this.profiles.forEach(profile => {
+                const div = document.createElement('div');
+                div.className = 'profile-item';
+                div.innerHTML = `
+                    <strong>${profile.name}</strong>
+                    <div>${profile.serverUrl}:${profile.port}</div>
+                    <div>MAC: ${profile.macAddress}</div>
+                    <small>${new Date(profile.createdAt).toLocaleDateString()}</small>
+                `;
+                div.onclick = () => this.loadProfile(profile);
+                profilesList.appendChild(div);
+            });
+        }
+        
+        modal.style.display = 'block';
+    }
+
+    loadProfile(profile) {
+        document.getElementById('serverUrl').value = profile.serverUrl;
+        document.getElementById('serverPort').value = profile.port;
+        document.getElementById('macAddress').value = profile.macAddress;
+        document.getElementById('deviceType').value = profile.deviceType;
+        
+        this.closeModal();
+        this.showMessage(`Profili "${profile.name}" u ngarkua!`, 'success');
+    }
+
+    closeModal() {
+        document.getElementById('profilesModal').style.display = 'none';
+    }
+
+    // Event handlers për video
+    onVideoLoaded() {
+        console.log('Video u ngarkua');
+    }
+
+    onVideoError() {
+        this.showMessage('Gabim në ngarkimin e video. Kontrollo stream-in.', 'error');
+    }
+
+    onVideoBuffering() {
+        this.updateStatus('🔄 Duke u buffuar...', 'loading');
+    }
+
+    onVideoPlaying() {
+        this.updateStatus('▶️ Duke luajtur', 'success');
+    }
+
+    // Keyboard controls
+    handleKeyboard(event) {
+        const videoPlayer = document.getElementById('videoPlayer');
+        
+        switch(event.key) {
+            case ' ':
+                event.preventDefault();
+                this.togglePlay();
+                break;
+            case 'f':
+            case 'F':
+                event.preventDefault();
+                this.toggleFullscreen();
+                break;
+            case 'm':
+            case 'M':
+                event.preventDefault();
+                this.toggleMute();
+                break;
+            case 'ArrowUp':
+                event.preventDefault();
+                this.volumeUp();
+                break;
+            case 'ArrowDown':
+                event.preventDefault();
+                this.volumeDown();
+                break;
+            case 'ArrowRight':
+                event.preventDefault();
+                videoPlayer.currentTime += 10;
+                break;
+            case 'ArrowLeft':
+                event.preventDefault();
+                videoPlayer.currentTime -= 10;
+                break;
+        }
+    }
+
+    // Filtri i kanaleve
+    filterChannels() {
+        this.displayChannels();
+    }
+
+    // Shfaq mesazhe
+    showMessage(message, type = 'info') {
+        // Implementim i thjeshtë alert-i
+        alert(`[${type.toUpperCase()}] ${message}`);
+    }
+
+    changeQuality() {
+        const qualitySelector = document.getElementById('qualitySelector');
+        const selectedQuality = qualitySelector.value;
+        
+        if (selectedQuality !== 'auto' && this.currentChannel) {
+            // Në praktikë, kjo do të ndryshonte stream-in në cilësinë e zgjedhur
+            this.showMessage(`Cilësia u ndryshua në: ${selectedQuality}`, 'info');
         }
     }
 }
 
-// Funksioni për parsimin e linjës EXTINF
-function parseExtinf(extinfLine) {
-    const match = extinfLine.match(/#EXTINF:.*?,(.*)$/);
-    const name = match ? match[1].trim() : 'Kanal i panjohur';
-    
-    // Nxjerr group/tvg-group nëse ekziston
-    const groupMatch = extinfLine.match(/group-title="([^"]*)"/);
-    const group = groupMatch ? groupMatch[1] : 'Të tjera';
-    
-    // Përcakton quality bazuar në emër
-    let quality = 'SD';
-    if (name.includes('HD')) quality = 'HD';
-    if (name.includes('4K')) quality = '4K';
-    if (name.includes('FHD')) quality = 'FHD';
-    
-    return { name, group, quality };
+// Funksionet globale për butonat HTML
+let stbPlayer;
+
+function connectToServer() {
+    if (!stbPlayer) stbPlayer = new STBPlayer();
+    stbPlayer.connectToServer();
 }
 
-// Funksioni për shfaqjen e kanaleve
-function displayChannels() {
-    const channelList = document.getElementById('channelList');
-    const categoryFilter = document.getElementById('categoryFilter');
-    
-    channelList.innerHTML = '';
-    
-    // Përditëso filterin e kategorive
-    const categories = [...new Set(channels.map(ch => ch.category))];
-    categoryFilter.innerHTML = '<option value="">Të gjitha kategoritë</option>';
-    categories.forEach(cat => {
-        categoryFilter.innerHTML += `<option value="${cat}">${cat}</option>`;
-    });
-    
-    // Shfaq kanalet e filtruara
-    const filteredChannels = getFilteredChannels();
-    
-    filteredChannels.forEach((channel, index) => {
-        const channelElement = document.createElement('div');
-        channelElement.className = 'channel-item';
-        channelElement.innerHTML = `
-            <strong>${channel.name}</strong>
-            <div style="font-size: 12px; opacity: 0.8;">
-                ${channel.category} • ${channel.quality}
-            </div>
-        `;
-        
-        channelElement.onclick = () => playChannel(channel);
-        channelList.appendChild(channelElement);
-    });
-    
-    document.getElementById('channelCount').textContent = `Kanale: ${filteredChannels.length}`;
+function generateMac() {
+    if (!stbPlayer) stbPlayer = new STBPlayer();
+    stbPlayer.generateMac();
 }
 
-// Funksioni për luajtjen e kanalit
-function playChannel(channel) {
-    const videoPlayer = document.getElementById('videoPlayer');
-    const currentChannelElement = document.getElementById('currentChannel');
-    
-    // Hiq klasën active nga të gjitha kanalet
-    document.querySelectorAll('.channel-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    
-    // Shto klasën active tek kanali i zgjedhur
-    event.target.closest('.channel-item').classList.add('active');
-    
-    currentChannel = channel;
-    currentChannelElement.textContent = `${channel.name} (${channel.quality})`;
-    
-    try {
-        videoPlayer.src = channel.url;
-        videoPlayer.load();
-        
-        videoPlayer.play().then(() => {
-            updateStatus(`Duke luajtur: ${channel.name}`, 'playing');
-        }).catch(e => {
-            console.error('Gabim në play:', e);
-            updateStatus('Gabim në luajtje - kontrollo stream-in', 'error');
-        });
-        
-    } catch (error) {
-        console.error('Gabim:', error);
-        updateStatus('Gabim në ngarkimin e stream-it', 'error');
-    }
+function saveProfile() {
+    if (!stbPlayer) stbPlayer = new STBPlayer();
+    stbPlayer.saveProfile();
 }
 
-// Funksionet e filtrit
-function getFilteredChannels() {
-    const searchTerm = document.getElementById('search').value.toLowerCase();
-    const category = document.getElementById('categoryFilter').value;
-    
-    return channels.filter(channel => {
-        const matchesSearch = channel.name.toLowerCase().includes(searchTerm);
-        const matchesCategory = !category || channel.category === category;
-        return matchesSearch && matchesCategory;
-    });
+function loadProfiles() {
+    if (!stbPlayer) stbPlayer = new STBPlayer();
+    stbPlayer.loadProfiles();
+}
+
+function closeModal() {
+    if (stbPlayer) stbPlayer.closeModal();
 }
 
 function filterChannels() {
-    displayChannels();
+    if (stbPlayer) stbPlayer.filterChannels();
 }
 
-// Kontrollet e player-it
-function toggleFullscreen() {
-    const videoContainer = document.querySelector('.video-container');
-    
-    if (!document.fullscreenElement) {
-        videoContainer.requestFullscreen().catch(err => {
-            console.error('Gabim në fullscreen:', err);
-        });
-    } else {
-        document.exitFullscreen();
-    }
+function togglePlay() {
+    if (stbPlayer) stbPlayer.togglePlay();
 }
 
 function toggleMute() {
-    const videoPlayer = document.getElementById('videoPlayer');
-    const muteButton = document.querySelector('.player-controls button:nth-child(2)');
-    
-    isMuted = !isMuted;
-    videoPlayer.muted = isMuted;
-    muteButton.textContent = isMuted ? '🔊' : '🔇';
+    if (stbPlayer) stbPlayer.toggleMute();
 }
 
-// Përditësimi i statusit
-function updateStatus(message, type) {
-    const statusElement = document.getElementById('connectionStatus');
-    statusElement.textContent = message;
-    
-    statusElement.className = '';
-    if (type === 'error') statusElement.style.color = '#ff6b6b';
-    else if (type === 'success') statusElement.style.color = '#51cf66';
-    else if (type === 'loading') statusElement.style.color = '#ffd700';
-    else statusElement.style.color = 'white';
+function volumeUp() {
+    if (stbPlayer) stbPlayer.volumeUp();
 }
 
-// Event listeners për keyboard shortcuts
-document.addEventListener('keydown', function(e) {
-    const videoPlayer = document.getElementById('videoPlayer');
-    
-    switch(e.key) {
-        case ' ':
-            e.preventDefault();
-            if (videoPlayer.paused) videoPlayer.play();
-            else videoPlayer.pause();
-            break;
-        case 'f':
-        case 'F':
-            toggleFullscreen();
-            break;
-        case 'm':
-        case 'M':
-            toggleMute();
-            break;
-    }
-});
+function volumeDown() {
+    if (stbPlayer) stbPlayer.volumeDown();
+}
 
-// Inicializimi
+function toggleFullscreen() {
+    if (stbPlayer) stbPlayer.toggleFullscreen();
+}
+
+function reloadStream() {
+    if (stbPlayer) stbPlayer.reloadStream();
+}
+
+function changeQuality() {
+    if (stbPlayer) stbPlayer.changeQuality();
+}
+
+// Inicializimi kur faja të ngarkohet
 document.addEventListener('DOMContentLoaded', function() {
-    updateStatus('Gati për përdorim', 'success');
+    stbPlayer = new STBPlayer();
 });
