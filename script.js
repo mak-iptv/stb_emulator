@@ -224,47 +224,52 @@ class STBPlayer {
         });
     }
 
-    playChannel(channel) {
-        if (!channel.isOnline) {
-            this.showMessage('Ky kanal nuk është online', 'warning');
-            return;
-        }
-        
-        this.currentChannel = channel;
-        const videoPlayer = document.getElementById('videoPlayer');
-        
-        // Hiq aktivin nga të gjitha kanalet
-        document.querySelectorAll('.channel-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        // Shto aktiv tek kanali i zgjedhur
-        event.target.closest('.channel-item').classList.add('active');
-        
-        // Përditëso informacionin
-        document.getElementById('currentChannelName').textContent = channel.name;
-        document.getElementById('streamQuality').textContent = channel.quality;
-        document.getElementById('streamBitrate').textContent = channel.bitrate;
-        document.getElementById('streamResolution').textContent = channel.resolution;
-        
-        // Përpiqu të luajë stream-in
-        try {
-            videoPlayer.src = channel.url;
-            videoPlayer.load();
-            
-            videoPlayer.play().then(() => {
-                this.updateStatus(`▶️ Duke luajtur: ${channel.name}`, 'success');
-            }).catch(error => {
-                console.error('Gabim në play:', error);
-                this.handleStreamError(channel);
-            });
-            
-        } catch (error) {
-            console.error('Gabim në ngarkimin e stream-it:', error);
-            this.handleStreamError(channel);
-        }
+   async playChannel(channel) {
+    if (!channel.isOnline) {
+        this.showMessage('Ky kanal nuk është online', 'warning');
+        return;
     }
-
+    
+    this.currentChannel = channel;
+    const videoPlayer = document.getElementById('videoPlayer');
+    
+    // Hiq aktivin nga të gjitha kanalet
+    document.querySelectorAll('.channel-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Shto aktiv tek kanali i zgjedhur
+    event.target.closest('.channel-item').classList.add('active');
+    
+    // Përditëso informacionin
+    document.getElementById('currentChannelName').textContent = channel.name;
+    document.getElementById('streamQuality').textContent = channel.quality;
+    document.getElementById('streamBitrate').textContent = channel.bitrate;
+    document.getElementById('streamResolution').textContent = channel.resolution;
+    
+    this.updateStatus('🔄 Duke përgatitur stream...', 'loading');
+    
+    try {
+        // Përdor proxy për stream
+        const streamUrl = await this.getStreamWithProxy(channel.url);
+        console.log('Duke përdorur URL:', streamUrl);
+        
+        videoPlayer.src = streamUrl;
+        videoPlayer.load();
+        
+        // Shto timeout për të shmangur ngërçet e pafundme
+        const playPromise = videoPlayer.play();
+        
+        if (playPromise !== undefined) {
+            await playPromise;
+            this.updateStatus(`▶️ Duke luajtur: ${channel.name}`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('Gabim në play:', error);
+        this.handleStreamError(channel);
+    }
+}
     handleStreamError(channel) {
         this.showMessage(`Nuk mund të luhet stream-i për ${channel.name}. Mund të jetë CORS ose format i pambështetur.`, 'error');
         
