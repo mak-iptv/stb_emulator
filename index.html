@@ -3,65 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STB MAG Player</title>
+    <title>STB MAG Player - URL:Port + MAC</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎬 STB MAG Web Player</h1>
-            <div class="controls">
-                <div class="server-input">
-                    <input type="text" id="serverUrl" placeholder="http://server-iptv.com:8080">
-                    <input type="text" id="username" placeholder="Përdoruesi">
-                    <input type="password" id="password" placeholder="Fjalëkalimi">
-                    <button onclick="loadSTBChannels()">Lidhu me Server</button>
+            <h1>📺 STB MAG Player me MAC</h1>
+            <div class="connection-panel">
+                <div class="server-config">
+                    <h3>Konfigurimi i Serverit</h3>
+                    <div class="input-group">
+                        <input type="text" id="serverUrl" placeholder="http://server-iptv.com" value="http://">
+                        <input type="text" id="serverPort" placeholder="Porti (8080)" value="8080">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="macAddress" placeholder="MAC Address (00:1A:79:XX:XX:XX)" value="00:1A:79:">
+                        <select id="deviceType">
+                            <option value="stb">STB</option>
+                            <option value="mag">MAG</option>
+                            <option value="smarttv">Smart TV</option>
+                            <option value="android">Android</option>
+                        </select>
+                    </div>
+                    <button onclick="connectToServer()" class="connect-btn">🔗 Lidhu me Server</button>
                 </div>
-                <div class="manual-upload">
-                    <input type="file" id="m3uFile" accept=".m3u,.m3u8">
-                    <button onclick="loadM3UFile()">Ngarko M3U</button>
+
+                <div class="quick-actions">
+                    <h3>Veprime të Shpejta</h3>
+                    <button onclick="generateMac()">🎲 Gjenero MAC</button>
+                    <button onclick="saveProfile()">💾 Ruaj Profil</button>
+                    <button onclick="loadProfiles()">📂 Profilet e Ruajtura</button>
                 </div>
             </div>
         </header>
 
         <div class="main-content">
+            <!-- Sidebar me kanale -->
             <div class="sidebar">
-                <div class="category-filter">
-                    <input type="text" id="search" placeholder="Kërko kanale..." onkeyup="filterChannels()">
+                <div class="channel-controls">
+                    <input type="text" id="searchChannels" placeholder="🔍 Kërko kanale..." onkeyup="filterChannels()">
                     <select id="categoryFilter" onchange="filterChannels()">
                         <option value="">Të gjitha kategoritë</option>
                     </select>
+                    <select id="qualityFilter" onchange="filterChannels()">
+                        <option value="">Të gjitha cilësitë</option>
+                        <option value="HD">HD</option>
+                        <option value="FHD">FHD</option>
+                        <option value="4K">4K</option>
+                        <option value="SD">SD</option>
+                    </select>
                 </div>
+
+                <div class="channel-stats">
+                    <span id="totalChannels">Total: 0</span>
+                    <span id="onlineChannels">Online: 0</span>
+                </div>
+
                 <div class="channel-list" id="channelList">
-                    <!-- Lista e kanaleve do të shfaqet këtu -->
+                    <div class="empty-state">
+                        📡 Lidhu me një server për të shfaqur kanalet
+                    </div>
                 </div>
             </div>
 
-            <div class="player-section">
+            <!-- Zona kryesore e player-it -->
+            <div class="player-area">
                 <div class="video-container">
                     <video id="videoPlayer" controls muted>
                         Browser-i juaj nuk mbështet video.
                     </video>
-                    <div class="player-info">
-                        <h3 id="currentChannel">Zgjidhni një kanal</h3>
-                        <div class="player-controls">
-                            <button onclick="toggleFullscreen()">🖥️ Ekran i Plotë</button>
-                            <button onclick="toggleMute()">🔇</button>
-                            <span id="qualityInfo">HD</span>
+                    
+                    <div class="player-overlay">
+                        <div class="current-channel-info">
+                            <h2 id="currentChannelName">Zgjidhni një kanal</h2>
+                            <div class="stream-info">
+                                <span id="streamQuality">-</span>
+                                <span id="streamBitrate">-</span>
+                                <span id="streamResolution">-</span>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
-                <div class="epg-info" id="epgInfo">
-                    <h4>Programi i Sotshëm</h4>
-                    <div id="epgContent">Nuk ka informacion EPG</div>
+
+                <div class="player-controls">
+                    <button onclick="togglePlay()" id="playBtn">⏸️ Pause</button>
+                    <button onclick="toggleMute()" id="muteBtn">🔊</button>
+                    <button onclick="volumeUp()">🔈+</button>
+                    <button onclick="volumeDown()">🔈-</button>
+                    <button onclick="toggleFullscreen()">🖥️ Ekran i Plotë</button>
+                    <button onclick="reloadStream()">🔄 Rifresko Stream</button>
+                    <select id="qualitySelector" onchange="changeQuality()">
+                        <option value="auto">Auto Quality</option>
+                    </select>
+                </div>
+
+                <!-- Informacioni i serverit -->
+                <div class="server-info-panel">
+                    <h3>📊 Informacioni i Serverit</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Status:</label>
+                            <span id="serverStatus" class="status-offline">I palidhur</span>
+                        </div>
+                        <div class="info-item">
+                            <label>MAC Address:</label>
+                            <span id="displayMac">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Server URL:</label>
+                            <span id="displayUrl">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Koha e lidhjes:</label>
+                            <span id="connectionTime">-</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
+        <!-- Status Bar -->
         <div class="status-bar">
-            <span id="connectionStatus">Jeni i palidhur</span>
-            <span id="channelCount">Kanale: 0</span>
+            <div class="status-left">
+                <span id="connectionStatus">👋 Mirë se vini në STB MAG Player</span>
+            </div>
+            <div class="status-right">
+                <span id="currentTime">--:--:--</span>
+                <span id="playerStatus">Pause</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal për profilet -->
+    <div id="profilesModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Profilet e Ruajtura</h2>
+            <div id="profilesList" class="profiles-list">
+                <!-- Profilet do të shfaqen këtu -->
+            </div>
         </div>
     </div>
 
