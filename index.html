@@ -1,126 +1,161 @@
 <!DOCTYPE html>
 <html lang="sq">
 <head>
-<meta charset="UTF-8" />
-<title>IPTV Player (TS + M3U8)</title>
+<meta charset="UTF-8">
+<title>IPTV Web Player - Xtream UI/M3U</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body {margin:0;background:#000;font-family:Arial;color:white;display:flex;height:100vh;}
-  #sidebar {width:320px;background:#111;overflow-y:auto;border-right:2px solid #222;padding:10px;}
-  #player {flex:1;display:flex;flex-direction:column;}
-  video {width:100%;height:100%;background:#000;}
-  .item {padding:8px;background:#222;margin-bottom:6px;border-radius:6px;cursor:pointer;}
-  .item:hover {background:#444;}
-  input{width:100%;padding:5px;border-radius:5px;border:1px solid #333;background:#111;color:white;margin-bottom:10px;}
+  body {margin:0;background:#0b0f1a;color:#fff;font-family:Arial,sans-serif;}
+  .container {display:flex;height:100vh;}
+  .sidebar {width:320px;background:#111;overflow-y:auto;padding:10px;box-sizing:border-box;}
+  .sidebar input, .sidebar button, .sidebar select {width:100%;margin-bottom:8px;padding:6px;border-radius:5px;border:none;background:#222;color:white;}
+  .sidebar button {background:#06b6d4;color:#000;cursor:pointer;}
+  .channel {padding:6px;margin-bottom:6px;background:#222;border-radius:5px;display:flex;align-items:center;cursor:pointer;}
+  .channel img {width:60px;height:35px;object-fit:cover;margin-right:8px;}
+  .channel:hover {background:#444;}
+  .main {flex:1;display:flex;flex-direction:column;}
+  video {flex:1;width:100%;background:#000;}
+  .controls {display:flex;gap:8px;padding:6px;background:#111;}
+  .controls button {flex:1;}
+  #log {height:100px;overflow:auto;background:#111;color:#9fb0c4;padding:6px;font-size:12px;}
 </style>
 </head>
 <body>
-
-<div id="sidebar">
-  <input id="m3uUrl" placeholder="Vendos URL të M3U" />
-  <button onclick="loadM3U()">Ngarko</button>
-  <div id="channels"></div>
-</div>
-
-<div id="player">
-  <video id="vid" controls autoplay></video>
+<div class="container">
+  <div class="sidebar">
+    <input id="m3uUrl" placeholder="Vendos URL M3U ose Xtream UI link">
+    <select id="proxyChoice">
+      <option value="auto">Auto CORS</option>
+      <option value="none">Pa Proxy</option>
+      <option value="allorigins">AllOrigins</option>
+      <option value="odyssey">Odyssey</option>
+    </select>
+    <button id="loadUrl">Ngarko Playlist</button>
+    <label style="display:block;cursor:pointer;margin-bottom:8px;">Ngarko skedarin M3U
+      <input type="file" id="fileInput" accept=".m3u,.txt" style="display:none;">
+    </label>
+    <input id="search" placeholder="Filtro kanalet...">
+    <div id="channels"></div>
+  </div>
+  <div class="main">
+    <video id="video" controls playsinline></video>
+    <div class="controls">
+      <button id="playPause">Play/Pause</button>
+      <button id="volDown">Vol -</button>
+      <button id="volUp">Vol +</button>
+      <button id="fullscreen">Fullscreen</button>
+      <button id="pip">PIP</button>
+    </div>
+    <div id="log"></div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script>
-let list = [];
+const video = document.getElementById('video');
+const channelsEl = document.getElementById('channels');
+const m3uUrl = document.getElementById('m3uUrl');
+const fileInput = document.getElementById('fileInput');
+const proxyChoice = document.getElementById('proxyChoice');
+const search = document.getElementById('search');
+const logEl = document.getElementById('log');
 
-async function fetchURL(url) {
-  try {
-    return await fetch(url);
-  } catch (e) {
-    return await fetch("https://cors-proxy.odyssey.workers.dev/?" + encodeURIComponent(url));
-  }
-}
+let channels = [];
+let hls = null;
 
-async function loadM3U() {
-  const url = document.getElementById("m3uUrl").value.trim();
-  if (!url) return;
+function log(msg){ const d=document.createElement('div'); d.textContent=msg; logEl.prepend(d); }
 
-  const res = await fetchURL(url);
-  const text = await res.text();
-
-  list = parseM3U(text);
-  render();
-}
-
-function parseM3U(text) {
+function parseM3U(text){
   const lines = text.split(/\r?\n/);
-  let ch = [];
-  let name = "";
-  for (let i=0;i<lines.length;i++){
-    if (lines[i].startsWith("#EXTINF")){
-      const m = lines[i].match(/,(.*)$/);
-      name = m ? m[1] : "Pa emër";
-    } else if (lines[i].startsWith("http")){
-      ch.push({name, url:lines[i]});
+  let items=[], name='';
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i].trim();
+    if(l.startsWith('#EXTINF')){
+      const m = l.match(/,(.*)$/);
+      name = m ? m[1] : 'Pa emër';
+    } else if(l && !l.startsWith('#')){
+      items.push({name,url:l});
     }
   }
-  return ch;
+  return items;
 }
 
-function render() {
-  const box = document.getElementById("channels");
-  box.innerHTML = "";
-  list.forEach((c,i)=>{
-    const div = document.createElement("div");
-    div.className = "item";
-    div.textContent = c.name;
-    div.onclick = ()=> play(c.url);
-    box.appendChild(div);
+function renderChannels(filter=''){
+  channelsEl.innerHTML='';
+  const filtered = channels.filter(c=>c.name.toLowerCase().includes(filter.toLowerCase()));
+  filtered.forEach(c=>{
+    const div = document.createElement('div'); div.className='channel';
+    div.innerHTML=`<div style="flex:1">${c.name}</div>`;
+    div.onclick=()=>play(c.url);
+    channelsEl.appendChild(div);
   });
 }
 
-function play(url) {
-  const video = document.getElementById("vid");
-
-  // LUAN M3U8 ME HLS.JS
-  if (url.endsWith(".m3u8")) {
-    if (Hls.isSupported()){
-      video.src = "";
-      const hls = new Hls();
+function play(url){
+  log('Luaj: '+url);
+  if(url.endsWith('.m3u8')){
+    if(Hls.isSupported()){
+      if(hls){ hls.destroy(); hls=null; }
+      hls=new Hls();
       hls.loadSource(url);
       hls.attachMedia(video);
-      return;
-    } else {
-      video.src = url;
-      return;
-    }
+      video.play().catch(()=>{});
+    } else { video.src=url; video.play().catch(()=>{}); }
+  } else {
+    video.src=url; video.play().catch(()=>{ alert('TS raw mund të mos luhet në browser.'); });
   }
-
-  // LUAN .TS (DIRECT TS)
-  if (url.endsWith(".ts")) {
-    // Shumica e shfletuesve nuk e luajnë TS direkt → përdorim MediaSource
-    try {
-      playTS(url);
-    } catch (e) {
-      alert("TS nuk u luajt. Duhet .m3u8 ose server transkodimi.");
-    }
-    return;
-  }
-
-  // default
-  video.src = url;
 }
 
-// PROVIMI ME MediaSource PËR TS
-async function playTS(url){
-  const video = document.getElementById("vid");
-  const ms = new MediaSource();
-  video.src = URL.createObjectURL(ms);
+// CORS fetch me fallback proxy
+async function fetchURL(url){
+  const mode = proxyChoice.value;
+  const proxies = [];
+  if(mode==='none') proxies.push(u=>u);
+  else if(mode==='allorigins') proxies.push(u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u));
+  else if(mode==='odyssey') proxies.push(u=>'https://cors-proxy.odyssey.workers.dev/?'+encodeURIComponent(u));
+  else proxies.push(u=>u, u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u), u=>'https://cors-proxy.odyssey.workers.dev/?'+encodeURIComponent(u));
 
-  ms.addEventListener("sourceopen", async ()=>{
-    const sb = ms.addSourceBuffer('video/mp2t; codecs="avc1.4d401e, mp4a.40.2"');
-    const r = await fetchURL(url);
-    const data = await r.arrayBuffer();
-    sb.appendBuffer(data);
-  });
+  let lastErr=null;
+  for(const p of proxies){
+    let u=typeof p==='function'?p(url):p;
+    try{
+      const res=await fetch(u); if(!res.ok) throw new Error('HTTP '+res.status);
+      return await res.text();
+    } catch(e){ lastErr=e; log('Dështoi fetch: '+e.message); }
+  }
+  throw lastErr;
 }
+
+async function loadFromURL(){
+  const url=m3uUrl.value.trim(); if(!url) return alert('Vendos URL!');
+  log('Ngarko URL: '+url);
+  try{
+    const text=await fetchURL(url);
+    channels=parseM3U(text);
+    renderChannels();
+    if(channels.length) play(channels[0].url);
+    log('Playlist ngarkuar '+channels.length+' kanale');
+  } catch(e){ alert('Gabim: '+e.message); log('Gabim: '+e.message); }
+}
+
+// Handlers
+document.getElementById('loadUrl').addEventListener('click', loadFromURL);
+fileInput.addEventListener('change', e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{ channels=parseM3U(ev.target.result); renderChannels(); if(channels.length) play(channels[0].url); log('Skedari M3U ngarkuar '+channels.length+' kanale'); };
+  r.readAsText(f);
+});
+search.addEventListener('input', ()=>renderChannels(search.value));
+
+document.getElementById('playPause').addEventListener('click', ()=>video.paused?video.play():video.pause());
+document.getElementById('volUp').addEventListener('click', ()=>video.volume=Math.min(1,video.volume+0.1));
+document.getElementById('volDown').addEventListener('click', ()=>video.volume=Math.max(0,video.volume-0.1));
+document.getElementById('fullscreen').addEventListener('click', ()=>video.requestFullscreen());
+document.getElementById('pip').addEventListener('click', async ()=>{
+  if(document.pictureInPictureElement) await document.exitPictureInPicture(); 
+  else try{ await video.requestPictureInPicture(); }catch(e){ alert(e.message); }
+});
 </script>
-
 </body>
 </html>
