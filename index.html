@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Player M3U</title>
+    <title>Video Player M3U</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="player-container">
-        <h1>Web Player M3U</h1>
+        <h1>Video Player M3U</h1>
         
         <div class="upload-section">
             <input type="file" id="m3uFile" accept=".m3u,.m3u8">
@@ -16,28 +16,36 @@
         </div>
 
         <div class="player">
-            <audio id="audioPlayer" controls>
-                <source src="" type="audio/mpeg">
-                Shfletuesi juaj nuk mbështet elementin audio.
-            </audio>
+            <video id="videoPlayer" controls>
+                <source src="" type="video/mp4">
+                Shfletuesi juaj nuk mbështet elementin video.
+            </video>
             
             <div class="controls">
-                <button id="prevBtn">⏮️</button>
-                <button id="playBtn">▶️</button>
-                <button id="pauseBtn">⏸️</button>
-                <button id="nextBtn">⏭️</button>
-                <span id="currentTime">00:00</span>
-                <span id="duration">00:00</span>
+                <button id="prevBtn">⏮️ Kanali Paraardhës</button>
+                <button id="playBtn">▶️ Luaj</button>
+                <button id="pauseBtn">⏸️ Pauzë</button>
+                <button id="nextBtn">⏭️ Kanali Tjetër</button>
+                <button id="fullscreenBtn">⛶ Ekran i Plotë</button>
             </div>
 
-            <div class="volume-control">
-                <span>🔊</span>
-                <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1">
+            <div class="player-controls">
+                <span id="currentTime">00:00:00</span>
+                <input type="range" id="progressBar" min="0" max="100" value="0">
+                <span id="duration">00:00:00</span>
+                
+                <div class="volume-control">
+                    <span>🔊</span>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="1">
+                </div>
             </div>
         </div>
 
         <div class="playlist">
-            <h3>Playlist</h3>
+            <h3>Lista e Kanaleve</h3>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Kërko kanale...">
+            </div>
             <ul id="playlistItems"></ul>
         </div>
     </div>
