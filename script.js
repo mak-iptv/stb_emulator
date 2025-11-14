@@ -2,9 +2,11 @@ class M3UPlayer {
     constructor() {
         this.playlist = [];
         this.currentTrackIndex = 0;
-        this.audioPlayer = document.getElementById('audioPlayer');
+        this.videoPlayer = document.getElementById('videoPlayer');
         this.playlistItems = document.getElementById('playlistItems');
+        this.searchInput = document.getElementById('searchInput');
         this.isPlaying = false;
+        this.filteredPlaylist = [];
 
         this.initializeEventListeners();
     }
@@ -32,18 +34,40 @@ class M3UPlayer {
             this.nextTrack();
         });
 
-        document.getElementById('volumeSlider').addEventListener('input', (e) => {
-            this.audioPlayer.volume = e.target.value;
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            this.toggleFullscreen();
         });
 
-        // Ndërhyrje kur përfundon një këngë
-        this.audioPlayer.addEventListener('ended', () => {
+        document.getElementById('volumeSlider').addEventListener('input', (e) => {
+            this.videoPlayer.volume = e.target.value;
+        });
+
+        document.getElementById('progressBar').addEventListener('input', (e) => {
+            const seekTime = (e.target.value / 100) * this.videoPlayer.duration;
+            this.videoPlayer.currentTime = seekTime;
+        });
+
+        // Kërkimi në playlist
+        this.searchInput.addEventListener('input', (e) => {
+            this.filterPlaylist(e.target.value);
+        });
+
+        // Ndërhyrje video
+        this.videoPlayer.addEventListener('timeupdate', () => {
+            this.updateProgress();
+        });
+
+        this.videoPlayer.addEventListener('loadedmetadata', () => {
+            this.updateDuration();
+        });
+
+        this.videoPlayer.addEventListener('ended', () => {
             this.nextTrack();
         });
 
-        // Përditësimi i kohës
-        this.audioPlayer.addEventListener('timeupdate', () => {
-            this.updateTime();
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            this.handleKeyboard(e);
         });
     }
 
@@ -53,11 +77,16 @@ class M3UPlayer {
         reader.onload = (e) => {
             const content = e.target.result;
             this.parseM3U(content);
+            this.filteredPlaylist = [...this.playlist];
             this.renderPlaylist();
             
             if (this.playlist.length > 0) {
                 this.loadTrack(0);
             }
+        };
+        
+        reader.onerror = () => {
+            alert('Gabim gjatë leximit të skedarit!');
         };
         
         reader.readAsText(file);
@@ -66,6 +95,7 @@ class M3UPlayer {
     parseM3U(content) {
         this.playlist = [];
         const lines = content.split('\n');
+        let currentGroup = 'General';
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -77,42 +107,105 @@ class M3UPlayer {
                     this.playlist.push({
                         title: trackInfo.title,
                         url: nextLine,
-                        duration: trackInfo.duration
+                        duration: trackInfo.duration,
+                        group: trackInfo.group || currentGroup,
+                        logo: trackInfo.logo
                     });
-                    i++; // Kalojmë linjën e URL-së
+                    i++;
                 }
+            } else if (line.startsWith('#EXTGRP:')) {
+                currentGroup = line.replace('#EXTGRP:', '').trim();
             } else if (line && !line.startsWith('#') && line !== '') {
-                // Shto direkt URL pa metadata
                 this.playlist.push({
-                    title: `Track ${this.playlist.length + 1}`,
+                    title: `Kanali ${this.playlist.length + 1}`,
                     url: line,
-                    duration: 0
+                    duration: 0,
+                    group: currentGroup
                 });
             }
         }
     }
 
     parseExtinf(extinfLine) {
-        const match = extinfLine.match(/#EXTINF:(-?\d+),(.*)/);
-        if (match) {
-            return {
-                duration: parseInt(match[1]),
-                title: match[2]
-            };
+        const info = {
+            duration: 0,
+            title: 'Unknown Channel',
+            group: 'General',
+            logo: null
+        };
+
+        // Marr titullin
+        const titleMatch = extinfLine.match(/,(.*)$/);
+        if (titleMatch) {
+            info.title = titleMatch[1].trim();
         }
-        return { duration: 0, title: 'Unknown Track' };
+
+        // Marr duration
+        const durationMatch = extinfLine.match(/:-?\d+/);
+        if (durationMatch) {
+            info.duration = parseInt(durationMatch[0].substr(1));
+        }
+
+        // Marr group
+        const groupMatch = extinfLine.match(/group-title="([^"]*)"/);
+        if (groupMatch) {
+            info.group = groupMatch[1];
+        }
+
+        // Marr logo
+        const logoMatch = extinfLine.match(/tvg-logo="([^"]*)"/);
+        if (logoMatch) {
+            info.logo = logoMatch[1];
+        }
+
+        return info;
+    }
+
+    filterPlaylist(searchTerm) {
+        if (!searchTerm) {
+            this.filteredPlaylist = [...this.playlist];
+        } else {
+            this.filteredPlaylist = this.playlist.filter(channel =>
+                channel.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                channel.group.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        this.renderPlaylist();
     }
 
     renderPlaylist() {
         this.playlistItems.innerHTML = '';
         
-        this.playlist.forEach((track, index) => {
+        if (this.filteredPlaylist.length === 0) {
             const li = document.createElement('li');
             li.className = 'playlist-item';
-            li.textContent = track.title;
+            li.textContent = 'Nuk u gjet asnjë kanal';
+            this.playlistItems.appendChild(li);
+            return;
+        }
+        
+        this.filteredPlaylist.forEach((channel, index) => {
+            const originalIndex = this.playlist.findIndex(c => c.url === channel.url);
+            const li = document.createElement('li');
+            li.className = 'playlist-item';
+            if (originalIndex === this.currentTrackIndex) {
+                li.classList.add('active');
+            }
+            
+            li.innerHTML = `
+                <div class="channel-logo">
+                    ${channel.logo ? `<img src="${channel.logo}" alt="${channel.title}" style="width:100%;height:100%;border-radius:50%;">` : '📺'}
+                </div>
+                <div class="channel-info">
+                    <div class="channel-name">${channel.title}</div>
+                    <div class="channel-group">${channel.group}</div>
+                </div>
+            `;
+            
             li.addEventListener('click', () => {
-                this.loadTrack(index);
+                this.loadTrack(originalIndex);
             });
+            
             this.playlistItems.appendChild(li);
         });
     }
@@ -122,10 +215,10 @@ class M3UPlayer {
             this.currentTrackIndex = index;
             const track = this.playlist[index];
             
-            this.audioPlayer.src = track.url;
+            this.videoPlayer.src = track.url;
             this.updateActiveTrack();
+            this.updatePlayerTitle(track.title);
             
-            // Përpiqemi të luajmë automatikisht
             this.play().catch(e => {
                 console.log('Auto-play prevented:', e);
             });
@@ -133,13 +226,16 @@ class M3UPlayer {
     }
 
     play() {
-        return this.audioPlayer.play().then(() => {
+        return this.videoPlayer.play().then(() => {
             this.isPlaying = true;
+        }).catch(e => {
+            console.error('Error playing video:', e);
+            alert('Gabim gjatë luajtjes së videos. Kontrolloni URL-në.');
         });
     }
 
     pause() {
-        this.audioPlayer.pause();
+        this.videoPlayer.pause();
         this.isPlaying = false;
     }
 
@@ -153,10 +249,21 @@ class M3UPlayer {
         this.loadTrack(prevIndex >= 0 ? prevIndex : this.playlist.length - 1);
     }
 
+    toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            this.videoPlayer.requestFullscreen().catch(err => {
+                console.log(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
     updateActiveTrack() {
         const items = this.playlistItems.querySelectorAll('.playlist-item');
         items.forEach((item, index) => {
-            if (index === this.currentTrackIndex) {
+            const originalIndex = this.playlist.findIndex(c => c.url === this.filteredPlaylist[index]?.url);
+            if (originalIndex === this.currentTrackIndex) {
                 item.classList.add('active');
             } else {
                 item.classList.remove('active');
@@ -164,24 +271,65 @@ class M3UPlayer {
         });
     }
 
-    updateTime() {
+    updateProgress() {
+        const progressBar = document.getElementById('progressBar');
         const currentTime = document.getElementById('currentTime');
-        const duration = document.getElementById('duration');
         
-        currentTime.textContent = this.formatTime(this.audioPlayer.currentTime);
-        duration.textContent = this.formatTime(this.audioPlayer.duration);
+        if (this.videoPlayer.duration) {
+            const progress = (this.videoPlayer.currentTime / this.videoPlayer.duration) * 100;
+            progressBar.value = progress;
+        }
+        
+        currentTime.textContent = this.formatTime(this.videoPlayer.currentTime);
+    }
+
+    updateDuration() {
+        const duration = document.getElementById('duration');
+        duration.textContent = this.formatTime(this.videoPlayer.duration);
     }
 
     formatTime(seconds) {
-        if (isNaN(seconds)) return '00:00';
+        if (isNaN(seconds)) return '00:00:00';
         
-        const mins = Math.floor(seconds / 60);
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
         const secs = Math.floor(seconds % 60);
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    updatePlayerTitle(title) {
+        document.title = `${title} - M3U Player`;
+    }
+
+    handleKeyboard(e) {
+        switch(e.key) {
+            case ' ':
+                e.preventDefault();
+                this.isPlaying ? this.pause() : this.play();
+                break;
+            case 'ArrowRight':
+                this.videoPlayer.currentTime += 10;
+                break;
+            case 'ArrowLeft':
+                this.videoPlayer.currentTime -= 10;
+                break;
+            case 'ArrowUp':
+                this.videoPlayer.volume = Math.min(1, this.videoPlayer.volume + 0.1);
+                document.getElementById('volumeSlider').value = this.videoPlayer.volume;
+                break;
+            case 'ArrowDown':
+                this.videoPlayer.volume = Math.max(0, this.videoPlayer.volume - 0.1);
+                document.getElementById('volumeSlider').value = this.videoPlayer.volume;
+                break;
+            case 'f':
+                this.toggleFullscreen();
+                break;
+        }
     }
 }
 
-// Initialize player kur faja të jetë e gatshme
+// Initialize player
 document.addEventListener('DOMContentLoaded', () => {
     new M3UPlayer();
 });
