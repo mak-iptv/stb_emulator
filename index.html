@@ -3,53 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MAG Web Player</title>
+    <title>MAG Web Player - IPTV Player</title>
     <link href="https://vjs.zencdn.net/8.0.4/video-js.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
         <!-- Header -->
         <header class="header">
-            <h1>🎬 MAG Web Player</h1>
-            <div class="connection-status" id="connectionStatus">
-                🔴 I palidhur
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fas fa-tv"></i>
+                    <h1>MAG Web Player</h1>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="connection-status" id="connectionStatus">
+                    <i class="fas fa-wifi"></i>
+                    <span>I palidhur</span>
+                </div>
+                <div class="user-info">
+                    <i class="fas fa-user"></i>
+                    <span id="userMac">MAC: ---</span>
+                </div>
             </div>
         </header>
 
-        <!-- Konfigurimi -->
-        <div class="config-panel">
-            <h3>🔧 Konfigurimi i Serverit</h3>
-            <div class="input-group">
-                <label>URL dhe Port:</label>
-                <input type="text" id="serverUrl" placeholder="http://serveri:port">
-            </div>
-            <div class="input-group">
-                <label>MAC Adresa:</label>
-                <input type="text" id="macAddress" placeholder="00:1A:79:XX:XX:XX">
-            </div>
-            <button onclick="connectToServer()">🔄 Lidhu me Serverin</button>
-        </div>
-        <!-- Shto këtë në config-panel -->
-<div class="debug-info">
-    <h4>🔍 Informacion Debug</h4>
-    <div id="debugLog" style="background: #000; color: #0f0; padding: 10px; border-radius: 5px; font-family: monospace; height: 100px; overflow-y: scroll; font-size: 12px;"></div>
-</div>
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <button class="nav-item active" data-tab="config">
+                        <i class="fas fa-cog"></i>
+                        <span>Konfigurimi</span>
+                    </button>
+                    <button class="nav-item" data-tab="channels">
+                        <i class="fas fa-list"></i>
+                        <span>Kanalet</span>
+                    </button>
+                    <button class="nav-item" data-tab="favorites">
+                        <i class="fas fa-star"></i>
+                        <span>Preferuar</span>
+                    </button>
+                    <button class="nav-item" data-tab="settings">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>Cilësimet</span>
+                    </button>
+                </nav>
+            </aside>
 
-        <!-- Player -->
-        <div class="player-container hidden" id="playerContainer">
-            <video id="videoPlayer" class="video-js vjs-default-skin" controls></video>
-        </div>
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Konfigurimi Tab -->
+                <div class="tab-content active" id="configTab">
+                    <div class="config-panel">
+                        <h2><i class="fas fa-server"></i> Konfigurimi i Serverit</h2>
+                        
+                        <div class="config-form">
+                            <div class="input-group">
+                                <label for="serverUrl">
+                                    <i class="fas fa-link"></i> URL dhe Porta e Serverit
+                                </label>
+                                <input type="text" id="serverUrl" 
+                                       placeholder="http://serveri-yte.com:8080"
+                                       value="http://">
+                                <div class="input-hint">
+                                    Shembull: http://serveri-im.com:8080 ose http://192.168.1.100:8000
+                                </div>
+                            </div>
 
-        <!-- Lista e Kanaleve -->
-        <div class="channels-container hidden" id="channelsContainer">
-            <h3>📺 Kanalet</h3>
-            <div class="channels-grid" id="channelsGrid">
-                <!-- Kanalet do të shfaqen këtu -->
+                            <div class="input-group">
+                                <label for="macAddress">
+                                    <i class="fas fa-address-card"></i> MAC Adresa
+                                </label>
+                                <input type="text" id="macAddress" 
+                                       placeholder="00:1A:79:XX:XX:XX"
+                                       value="00:1A:79:">
+                                <div class="input-hint">
+                                    Shembull: 00:1A:79:AB:CD:EF ose 00-1A-79-12-34-56
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-primary" onclick="connectToServer()">
+                                    <i class="fas fa-plug"></i> Lidhu me Serverin
+                                </button>
+                                <button class="btn btn-secondary" onclick="clearConfig()">
+                                    <i class="fas fa-broom"></i> Pastro
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Test Section -->
+                        <div class="test-section">
+                            <h3><i class="fas fa-vial"></i> Testo Konfigurimin</h3>
+                            <div class="test-buttons">
+                                <button class="btn btn-info" onclick="testURL()">
+                                    <i class="fas fa-link"></i> Testo URL
+                                </button>
+                                <button class="btn btn-info" onclick="testMAC()">
+                                    <i class="fas fa-address-card"></i> Testo MAC
+                                </button>
+                                <button class="btn btn-success" onclick="testFullConnection()">
+                                    <i class="fas fa-bolt"></i> Testo Plotësisht
+                                </button>
+                            </div>
+                            <div id="testResults" class="test-results"></div>
+                        </div>
+
+                        <!-- Examples -->
+                        <div class="examples">
+                            <h3><i class="fas fa-lightbulb"></i> Shembuj të Saktë</h3>
+                            <div class="example-grid">
+                                <div class="example-item">
+                                    <div class="example-title">Server me Emër</div>
+                                    <div class="example-url">http://iptv-server.com:8080</div>
+                                    <div class="example-mac">00:1A:79:AB:CD:EF</div>
+                                </div>
+                                <div class="example-item">
+                                    <div class="example-title">Server Lokal</div>
+                                    <div class="example-url">http://192.168.1.100:8000</div>
+                                    <div class="example-mac">00-1A-79-12-34-56</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kanale Tab -->
+                <div class="tab-content" id="channelsTab">
+                    <div class="channels-header">
+                        <h2><i class="fas fa-tv"></i> Kanalet</h2>
+                        <div class="channels-controls">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="channelSearch" placeholder="Kërko kanale...">
+                            </div>
+                            <button class="btn btn-outline" onclick="refreshChannels()">
+                                <i class="fas fa-sync-alt"></i> Rifresko
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="channels-container">
+                        <div class="categories-sidebar">
+                            <div class="category-item active" data-category="all">
+                                <i class="fas fa-globe"></i>
+                                <span>Të gjitha</span>
+                            </div>
+                            <div class="category-item" data-category="entertainment">
+                                <i class="fas fa-film"></i>
+                                <span>Argëtim</span>
+                            </div>
+                            <div class="category-item" data-category="news">
+                                <i class="fas fa-newspaper"></i>
+                                <span>Lajme</span>
+                            </div>
+                            <div class="category-item" data-category="sports">
+                                <i class="fas fa-baseball-ball"></i>
+                                <span>Sport</span>
+                            </div>
+                        </div>
+
+                        <div class="channels-grid" id="channelsGrid">
+                            <!-- Kanale do të shfaqen këtu -->
+                            <div class="no-channels" id="noChannels">
+                                <i class="fas fa-tv"></i>
+                                <h3>Nuk ka kanale të shfaqura</h3>
+                                <p>Lidhuni me serverin tuaj për të shfaqur kanalet</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Player Section -->
+                <div class="player-section" id="playerSection">
+                    <div class="player-header">
+                        <h3 id="nowPlaying">Nuk po luhet asgjë</h3>
+                        <button class="btn btn-close" onclick="closePlayer()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="video-container">
+                        <video id="videoPlayer" class="video-js vjs-default-skin" controls playsinline>
+                            <p class="vjs-no-js">
+                                Shfletuesi juaj nuk mbështet HTML5 video.
+                            </p>
+                        </video>
+                    </div>
+                    <div class="player-info">
+                        <div class="info-item">
+                            <i class="fas fa-info-circle"></i>
+                            <span id="playerStatus">Gati për luajtje</span>
+                        </div>
+                        <div class="info-item">
+                            <i class="fas fa-clock"></i>
+                            <span id="playerTime">00:00:00</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner"></div>
+        <p>Duke u lidhur me serverin...</p>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://vjs.zencdn.net/8.0.4/video.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script src="app.js"></script>
