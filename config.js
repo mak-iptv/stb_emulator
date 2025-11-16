@@ -507,3 +507,74 @@ const magConfig = new MAGConfig();
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { MAGConfig, magConfig };
 }
+// Shto këtë në klasën MAGConfig
+getDebugEndpoints(serverUrl) {
+    const baseUrls = [];
+    
+    // Testo porta të ndryshme
+    const ports = [80, 8080, 8000, 8001, 8008, 8081, 8888, 8443, 1935];
+    const protocols = ['http', 'https'];
+    
+    protocols.forEach(protocol => {
+        ports.forEach(port => {
+            // Nëse URL ka tashmë portë, mos e ndrysho
+            if (!serverUrl.includes(':')) {
+                baseUrls.push(`${protocol}://${serverUrl}:${port}`);
+            }
+        });
+    });
+    
+    return baseUrls;
+}
+
+// Metodë për debug
+async debugConnection(serverUrl, macAddress) {
+    const debugResults = {
+        success: false,
+        workingUrls: [],
+        errors: [],
+        suggestions: []
+    };
+
+    // Gjenero URL të mundshme
+    const possibleUrls = this.getDebugEndpoints(serverUrl);
+    
+    for (let url of possibleUrls) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            
+            const response = await fetch(url, {
+                method: 'HEAD',
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                debugResults.workingUrls.push({
+                    url: url,
+                    status: response.status,
+                    headers: Object.fromEntries(response.headers)
+                });
+            }
+        } catch (error) {
+            debugResults.errors.push({
+                url: url,
+                error: error.message
+            });
+        }
+    }
+
+    // Gjenero sugjerime
+    if (debugResults.workingUrls.length > 0) {
+        debugResults.success = true;
+        debugResults.suggestions.push('U gjetën serverë funksionalë!');
+    } else {
+        debugResults.suggestions.push('Kontrolloni nëse serveri është online');
+        debugResults.suggestions.push('Kontrolloni firewall-in dhe portat');
+        debugResults.suggestions.push('Provoni http në vend të https (ose anasjelltas)');
+    }
+
+    return debugResults;
+}
