@@ -1,166 +1,52 @@
 <!DOCTYPE html>
 <html lang="sq">
 <head>
-<meta charset="UTF-8">
-<title>IBO-style IPTV Web Player</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  body {margin:0;background:#0b0f1a;color:#fff;font-family:Arial,sans-serif;}
-  .container {display:flex;height:100vh;}
-  .sidebar {width:360px;background:#111;overflow-y:auto;padding:10px;box-sizing:border-box;}
-  .sidebar input, .sidebar button, .sidebar select {width:100%;margin-bottom:8px;padding:6px;border-radius:5px;border:none;background:#222;color:white;}
-  .sidebar button {background:#06b6d4;color:#000;cursor:pointer;}
-  .channel {padding:6px;margin-bottom:6px;background:#222;border-radius:5px;display:flex;align-items:center;cursor:pointer;transition:0.2s;}
-  .channel img {width:60px;height:35px;object-fit:cover;margin-right:8px;border-radius:4px;}
-  .channel:hover {background:#444;transform:scale(1.02);}
-  .channel .group {font-size:12px;color:#9fb0c4;}
-  .main {flex:1;display:flex;flex-direction:column;}
-  video {flex:1;width:100%;background:#000;border-radius:8px;}
-  .controls {display:flex;gap:8px;padding:6px;background:#111;flex-wrap:wrap;}
-  .controls button {flex:1;padding:6px;border-radius:6px;border:none;background:#06b6d4;color:#000;cursor:pointer;}
-  #log {height:100px;overflow:auto;background:#111;color:#9fb0c4;padding:6px;font-size:12px;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAG Web Player</title>
+    <link href="https://vjs.zencdn.net/8.0.4/video-js.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container">
-  <div class="sidebar">
-    <input id="m3uUrl" placeholder="Vendos URL M3U ose Xtream UI link">
-    <select id="proxyChoice">
-      <option value="auto">Auto CORS</option>
-      <option value="none">Pa Proxy</option>
-      <option value="allorigins">AllOrigins</option>
-      <option value="odyssey">Odyssey</option>
-    </select>
-    <button id="loadUrl">Ngarko Playlist</button>
-    <label style="display:block;cursor:pointer;margin-bottom:8px;">Ngarko skedarin M3U
-      <input type="file" id="fileInput" accept=".m3u,.txt" style="display:none;">
-    </label>
-    <input id="search" placeholder="Filtro kanalet...">
-    <div id="channels"></div>
-  </div>
-  <div class="main">
-    <video id="video" controls playsinline></video>
-    <div class="controls">
-      <button id="playPause">Play/Pause</button>
-      <button id="volDown">Vol -</button>
-      <button id="volUp">Vol +</button>
-      <button id="fullscreen">Fullscreen</button>
-      <button id="pip">PIP</button>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🎬 MAG Web Player</h1>
+            <div class="connection-status" id="connectionStatus">
+                🔴 I palidhur
+            </div>
+        </header>
+
+        <!-- Konfigurimi -->
+        <div class="config-panel">
+            <h3>🔧 Konfigurimi i Serverit</h3>
+            <div class="input-group">
+                <label>URL dhe Port:</label>
+                <input type="text" id="serverUrl" placeholder="http://serveri:port">
+            </div>
+            <div class="input-group">
+                <label>MAC Adresa:</label>
+                <input type="text" id="macAddress" placeholder="00:1A:79:XX:XX:XX">
+            </div>
+            <button onclick="connectToServer()">🔄 Lidhu me Serverin</button>
+        </div>
+
+        <!-- Player -->
+        <div class="player-container hidden" id="playerContainer">
+            <video id="videoPlayer" class="video-js vjs-default-skin" controls></video>
+        </div>
+
+        <!-- Lista e Kanaleve -->
+        <div class="channels-container hidden" id="channelsContainer">
+            <h3>📺 Kanalet</h3>
+            <div class="channels-grid" id="channelsGrid">
+                <!-- Kanalet do të shfaqen këtu -->
+            </div>
+        </div>
     </div>
-    <div id="log"></div>
-  </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script>
-const video = document.getElementById('video');
-const channelsEl = document.getElementById('channels');
-const m3uUrl = document.getElementById('m3uUrl');
-const fileInput = document.getElementById('fileInput');
-const proxyChoice = document.getElementById('proxyChoice');
-const search = document.getElementById('search');
-const logEl = document.getElementById('log');
-
-let channels = [];
-let hls = null;
-
-function log(msg){ const d=document.createElement('div'); d.textContent=msg; logEl.prepend(d); }
-
-function parseM3U(text){
-  const lines = text.split(/\r?\n/);
-  let items=[], name='', group='', logo='';
-  for(let i=0;i<lines.length;i++){
-    const l=lines[i].trim();
-    if(l.startsWith('#EXTINF')){
-      const mName = l.match(/,(.*)$/);
-      name = mName ? mName[1] : 'Pa emër';
-      const mGroup = l.match(/group-title="([^"]+)"/i);
-      group = mGroup ? mGroup[1] : '';
-      const mLogo = l.match(/tvg-logo="([^"]+)"/i);
-      logo = mLogo ? mLogo[1] : '';
-    } else if(l && !l.startsWith('#')){
-      items.push({name,url:l,group,logo});
-    }
-  }
-  return items;
-}
-
-function renderChannels(filter=''){
-  channelsEl.innerHTML='';
-  const filtered = channels.filter(c=>c.name.toLowerCase().includes(filter.toLowerCase()) || c.group.toLowerCase().includes(filter.toLowerCase()));
-  filtered.forEach(c=>{
-    const div = document.createElement('div'); div.className='channel';
-    div.innerHTML=`${c.logo?'<img src="'+c.logo+'">':''}<div><b>${c.name}</b>${c.group?'<div class="group">'+c.group+'</div>':''}</div>`;
-    div.onclick=()=>play(c.url);
-    channelsEl.appendChild(div);
-  });
-}
-
-function play(url){
-  log('Luaj: '+url);
-  if(url.endsWith('.m3u8')){
-    if(Hls.isSupported()){
-      if(hls){ hls.destroy(); hls=null; }
-      hls=new Hls();
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      video.play().catch(()=>{});
-    } else { video.src=url; video.play().catch(()=>{}); }
-  } else {
-    video.src=url; video.play().catch(()=>{ alert('TS raw mund të mos luhet në browser.'); });
-  }
-}
-
-// CORS fetch me fallback proxy
-async function fetchURL(url){
-  const mode = proxyChoice.value;
-  const proxies = [];
-  if(mode==='none') proxies.push(u=>u);
-  else if(mode==='allorigins') proxies.push(u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u));
-  else if(mode==='odyssey') proxies.push(u=>'https://cors-proxy.odyssey.workers.dev/?'+encodeURIComponent(u));
-  else proxies.push(u=>u, u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u), u=>'https://cors-proxy.odyssey.workers.dev/?'+encodeURIComponent(u));
-
-  let lastErr=null;
-  for(const p of proxies){
-    let u=typeof p==='function'?p(url):p;
-    try{
-      const res=await fetch(u); if(!res.ok) throw new Error('HTTP '+res.status);
-      return await res.text();
-    } catch(e){ lastErr=e; log('Dështoi fetch: '+e.message); }
-  }
-  throw lastErr;
-}
-
-async function loadFromURL(){
-  const url=m3uUrl.value.trim(); if(!url) return alert('Vendos URL!');
-  log('Ngarko URL: '+url);
-  try{
-    const text=await fetchURL(url);
-    channels=parseM3U(text);
-    renderChannels();
-    if(channels.length) play(channels[0].url);
-    log('Playlist ngarkuar '+channels.length+' kanale');
-  } catch(e){ alert('Gabim: '+e.message); log('Gabim: '+e.message); }
-}
-
-// Handlers
-document.getElementById('loadUrl').addEventListener('click', loadFromURL);
-fileInput.addEventListener('change', e=>{
-  const f=e.target.files[0]; if(!f) return;
-  const r=new FileReader();
-  r.onload=ev=>{ channels=parseM3U(ev.target.result); renderChannels(); if(channels.length) play(channels[0].url); log('Skedari M3U ngarkuar '+channels.length+' kanale'); };
-  r.readAsText(f);
-});
-search.addEventListener('input', ()=>renderChannels(search.value));
-
-document.getElementById('playPause').addEventListener('click', ()=>video.paused?video.play():video.pause());
-document.getElementById('volUp').addEventListener('click', ()=>video.volume=Math.min(1,video.volume+0.1));
-document.getElementById('volDown').addEventListener('click', ()=>video.volume=Math.max(0,video.volume-0.1));
-document.getElementById('fullscreen').addEventListener('click', ()=>video.requestFullscreen());
-document.getElementById('pip').addEventListener('click', async ()=>{
-  if(document.pictureInPictureElement) await document.exitPictureInPicture(); 
-  else try{ await video.requestPictureInPicture(); }catch(e){ alert(e.message); }
-});
-</script>
+    <script src="https://vjs.zencdn.net/8.0.4/video.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="app.js"></script>
 </body>
 </html>
