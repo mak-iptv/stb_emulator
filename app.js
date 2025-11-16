@@ -657,6 +657,142 @@ async function testFullConnection() {
     }
 }
 
+// Funksion për debug të avancuar
+async runAdvancedDebug() {
+    const serverUrl = document.getElementById('serverUrl').value.trim();
+    const macAddress = document.getElementById('macAddress').value.trim();
+    const results = document.getElementById('advancedDebugResults');
+    
+    if (!serverUrl) {
+        results.innerHTML = '<div class="debug-error">❌ Ju lutem shkruani URL-në e serverit</div>';
+        return;
+    }
+    
+    results.innerHTML = '<div class="debug-warning">🔍 Duke kryer debug të plotë...</div>';
+    
+    try {
+        const debugInfo = await magConfig.debugConnection(serverUrl, macAddress);
+        
+        let html = '';
+        
+        if (debugInfo.success) {
+            html += '<div class="debug-success">✅ U gjetën serverë funksionalë!</div>';
+            
+            debugInfo.workingUrls.forEach((item, index) => {
+                html += `
+                    <div style="margin: 10px 0; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 5px;">
+                        <strong>Server ${index + 1}:</strong> ${item.url}<br>
+                        <strong>Status:</strong> ${item.status}<br>
+                        <strong>Headers:</strong> ${JSON.stringify(item.headers)}
+                    </div>
+                `;
+            });
+        } else {
+            html += '<div class="debug-error">❌ Asnjë server funksional nuk u gjet</div>';
+        }
+        
+        // Shfaq gabimet
+        if (debugInfo.errors.length > 0) {
+            html += '<div style="margin-top: 15px;"><strong>Gabimet:</strong></div>';
+            debugInfo.errors.forEach(error => {
+                html += `<div style="color: #ef4444; margin: 5px 0;">❌ ${error.url}: ${error.error}</div>`;
+            });
+        }
+        
+        // Shfaq sugjerimet
+        if (debugInfo.suggestions.length > 0) {
+            html += '<div style="margin-top: 15px;"><strong>Sugjerime:</strong></div>';
+            debugInfo.suggestions.forEach(suggestion => {
+                html += `<div style="color: #f59e0b; margin: 5px 0;">💡 ${suggestion}</div>`;
+            });
+        }
+        
+        results.innerHTML = html;
+        
+    } catch (error) {
+        results.innerHTML = `<div class="debug-error">❌ Gabim në debug: ${error.message}</div>`;
+    }
+}
+
+// Kontrollo portat e zakonshme
+async checkCommonPorts() {
+    const serverUrl = document.getElementById('serverUrl').value.trim();
+    const results = document.getElementById('advancedDebugResults');
+    
+    if (!serverUrl) {
+        results.innerHTML = '<div class="debug-error">❌ Ju lutem shkruani URL-në e serverit</div>';
+        return;
+    }
+    
+    // Nxjerr hostname nga URL
+    let hostname = serverUrl.replace(/^https?:\/\//, '').split(':')[0].split('/')[0];
+    
+    results.innerHTML = '<div class="debug-warning">🔍 Duke kontrolluar portat e zakonshme...</div>';
+    
+    const ports = [80, 8080, 8000, 8001, 8008, 8081, 8888];
+    const resultsHtml = [];
+    
+    for (let port of ports) {
+        try {
+            const testUrl = `http://${hostname}:${port}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            
+            const response = await fetch(testUrl, {
+                method: 'HEAD',
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                resultsHtml.push(`<div style="color: #10b981;">✅ Porta ${port} është e hapur - ${testUrl}</div>`);
+            }
+        } catch (error) {
+            resultsHtml.push(`<div style="color: #ef4444;">❌ Porta ${port} është e mbyllur</div>`);
+        }
+    }
+    
+    results.innerHTML = resultsHtml.join('');
+}
+
+// Metodë për të provuar URL të ndryshme automatikisht
+async autoDiscoverServer() {
+    const serverUrl = document.getElementById('serverUrl').value.trim();
+    const results = document.getElementById('testResults');
+    
+    results.innerHTML = '<div style="color: orange;">🔄 Duke kërkuar serverin automatikisht...</div>';
+    
+    try {
+        const debugInfo = await magConfig.debugConnection(serverUrl, '');
+        
+        if (debugInfo.workingUrls.length > 0) {
+            const firstWorkingUrl = debugInfo.workingUrls[0].url;
+            document.getElementById('serverUrl').value = firstWorkingUrl;
+            
+            results.innerHTML = `
+                <div style="color: green;">
+                    ✅ Serveri u gjet automatikisht!<br>
+                    📍 URL e re: ${firstWorkingUrl}<br>
+                    🚀 Tani mund të lidheni
+                </div>
+            `;
+        } else {
+            results.innerHTML = `
+                <div style="color: red;">
+                    ❌ Nuk u gjet asnjë server<br>
+                    🔧 Provoni manualisht:<br>
+                    • http://serveri:8080<br>
+                    • http://serveri:8000<br>
+                    • http://serveri:8888
+                </div>
+            `;
+        }
+    } catch (error) {
+        results.innerHTML = `<div style="color: red;">❌ Gabim në kërkim: ${error.message}</div>`;
+    }
+}
+
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 MAG Web Player u ngarkua');
